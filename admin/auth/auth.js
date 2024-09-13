@@ -2,19 +2,26 @@ const express = require("express");
 const { db } = require("../../config/firebase");
 const { Timestamp } = require("@google-cloud/firestore");
 const jwt = require("jsonwebtoken");
+const { checkAuth } = require("../../middlewares/authMiddleware");
 
 const router = express.Router();
 
 const createAuth = async (req, res) => {
-  const body = req.body;
-  await db
-    .collection("users")
-    .doc("internal_users")
-    .collection("credentials")
-    .doc()
-    .set({ ...body, createdAt: Timestamp.now() });
+  try {
+    const body = req.body;
+    await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .doc()
+      .set({ ...body, createdAt: Timestamp.now() });
 
-  res.status(200).send("User created successfully");
+    res
+      .status(200)
+      .send({ message: "User created successfully", success: true });
+  } catch (error) {
+    res.status(500).send({ message: error.message, success: false });
+  }
 };
 
 // Login for internal users
@@ -41,20 +48,43 @@ const logIn = async (req, res) => {
       return res.status(401).send("Invalid email or password");
     }
 
-    const token = jwt.sign(
-      { email: user.email, password: user.password },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    const jwtPayload = {
+      email: user.email,
+    };
 
-    res.status(200).send({ token, role: user.role });
+    if (user.role) {
+      jwtPayload.role = user.role;
+    }
+
+    const token = jwt.sign(jwtPayload, process.env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
+
+    res.status(200).send({ token, success: true });
   } catch (error) {
     console.log(error);
-    res.status(500).send({ error: error.message });
+    res.status(500).send({ message: error.message, success: false });
   }
 };
 
-router.post("/createAuth", createAuth);
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .get();
+    res.status(200).send({
+      users: users.docs.map((doc) => ({ ...doc.data(), id: doc.id })),
+      success: true,
+    });
+  } catch (error) {
+    res.status(500).send({ message: error.message, success: false });
+  }
+};
+
+router.post("/createAuth", checkAuth, createAuth);
 router.post("/login", logIn);
+router.get("/getAllUsers", checkAuth, getAllUsers);
 
 module.exports = { auth: router };
