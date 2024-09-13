@@ -60,7 +60,7 @@ const logIn = async (req, res) => {
       expiresIn: "1d",
     });
 
-    res.status(200).send({ token, success: true });
+    res.status(200).send({ token, success: true, role: user.role });
   } catch (error) {
     console.log(error);
     res.status(500).send({ message: error.message, success: false });
