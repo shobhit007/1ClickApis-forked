@@ -84,8 +84,24 @@ const getRoles = async (req, res) => {
   }
 };
 
+const getRolePermissions = async (req, res) => {
+  try {
+    const role = req.role;
+    const roleSnap = await db
+      .collection("users")
+      .doc("rolesAndPermissions")
+      .collection("roles")
+      .doc(role)
+      .get();
+    const permissions = roleSnap.data().permissions;
+    res.status(200).send({ role, permissions, success: true });
+  } catch (error) {
+    res.status(500).send({ message: error.message, success: false });
+  }
+};
 router.post("/assignRole", checkAuth, assignRole);
 router.post("/createRole", checkAuth, createRole);
 router.post("/assignPanelToRole", checkAuth, assignPanelToRole);
 router.get("/getRoles", checkAuth, getRoles);
+router.get("/getRolePermissions", checkAuth, getRolePermissions);
 module.exports = { roles: router };
