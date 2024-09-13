@@ -44,10 +44,10 @@ const logIn = async (req, res) => {
     const token = jwt.sign(
       { email: user.email, password: user.password },
       process.env.JWT_SECRET,
-      { expiresIn: "15d" }
+      { expiresIn: "1d" }
     );
 
-    res.status(200).send({ token });
+    res.status(200).send({ token, role: user.role });
   } catch (error) {
     console.log(error);
     res.status(500).send({ error: error.message });
