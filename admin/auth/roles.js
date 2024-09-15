@@ -2,6 +2,7 @@ const express = require("express");
 const { db } = require("../../config/firebase");
 const { FieldValue } = require("firebase-admin/firestore");
 const { checkAuth } = require("../../middlewares/authMiddleware");
+const { firestore } = require("firebase-admin");
 
 const router = express.Router();
 
@@ -70,7 +71,7 @@ const assignPanelToRole = async (req, res) => {
     res.status(500).send({ message: error.message, success: false });
   }
 };
-const getRoles = async (req, res) => {
+const getAllRoles = async (req, res) => {
   try {
     const snapshot = await db
       .collection("users")
@@ -84,7 +85,7 @@ const getRoles = async (req, res) => {
   }
 };
 
-const getRolePermissions = async (req, res) => {
+const getRolePanels = async (req, res) => {
   try {
     const role = req.role;
     const roleSnap = await db
@@ -94,14 +95,34 @@ const getRolePermissions = async (req, res) => {
       .doc(role)
       .get();
     const permissions = roleSnap.data().permissions;
-    res.status(200).send({ role, permissions, success: true });
+    res.status(200).send({ id: role, panels: permissions, success: true });
   } catch (error) {
     res.status(500).send({ message: error.message, success: false });
   }
 };
+
+const getRoles = async (req, res) => {
+  try {
+    const snapshot = await db
+      .collection("users")
+      .doc("rolesAndPermissions")
+      .collection("roles")
+      .get();
+    const roles = snapshot.docs.map((doc) => ({
+      panels: doc.data().permissions,
+      id: doc.id,
+    }));
+
+    res.status(200).send({ roles });
+  } catch (error) {
+    res.status(500).send({ message: error.message, success: false });
+  }
+};
+
 router.post("/assignRole", checkAuth, assignRole);
 router.post("/createRole", checkAuth, createRole);
 router.post("/assignPanelToRole", checkAuth, assignPanelToRole);
-router.get("/getRoles", checkAuth, getRoles);
-router.get("/getRolePermissions", checkAuth, getRolePermissions);
+router.get("/getAllRoles", getAllRoles);
+router.get("/getRolePanels", getRolePanels);
+router.get("/getRoles", getRoles);
 module.exports = { roles: router };
