@@ -54,6 +54,7 @@ const logIn = async (req, res) => {
 
     const jwtPayload = {
       email: user.email,
+      name: user.name,
     };
 
     if (user.role) {
@@ -87,8 +88,37 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+const updateUser = async (req, res) => {
+  try {
+    const body = req.body;
+    const email = body.email;
+    const userSnap = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .where("email", "==", email)
+      .get();
+
+    const userId = userSnap.docs[0].id;
+    await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .doc(userId)
+      .update(body);
+
+    res.status(200).send({
+      message: "User updated successfully",
+      success: true,
+    });
+  } catch (error) {
+    res.status(500).send({ message: error.message, success: false });
+  }
+};
+
 router.post("/createAuth", checkAuth, createAuth);
 router.post("/login", logIn);
 router.get("/getAllUsers", checkAuth, getAllUsers);
+router.post("/updateUser", checkAuth, updateUser);
 
 module.exports = { auth: router };
