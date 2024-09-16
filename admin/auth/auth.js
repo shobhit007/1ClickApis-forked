@@ -52,6 +52,12 @@ const logIn = async (req, res) => {
         .send({ success: false, message: "Invalid email or password" });
     }
 
+    if (!user.isActive) {
+      return res
+        .status(401)
+        .send({ success: false, message: "You are not authorized" });
+    }
+
     const jwtPayload = {
       email: user.email,
       name: user.name,
