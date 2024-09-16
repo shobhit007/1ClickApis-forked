@@ -39,13 +39,17 @@ const logIn = async (req, res) => {
       .get();
 
     if (userSnap.empty) {
-      return res.status(404).send("User not found");
+      return res
+        .status(404)
+        .send({ success: false, message: "User not found" });
     }
 
     const user = userSnap.docs[0].data();
 
     if (user.password !== password) {
-      return res.status(401).send("Invalid email or password");
+      return res
+        .status(401)
+        .send({ success: false, message: "Invalid email or password" });
     }
 
     const jwtPayload = {

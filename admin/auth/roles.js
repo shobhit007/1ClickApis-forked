@@ -53,7 +53,7 @@ const createRole = async (req, res) => {
 const assignPanelToRole = async (req, res) => {
   try {
     const role = req.body.role;
-    const panel = req.body.panel;
+    const panels = req.body.panels;
 
     await db
       .collection("users")
@@ -61,7 +61,7 @@ const assignPanelToRole = async (req, res) => {
       .collection("roles")
       .doc(role)
       .update({
-        permissions: FieldValue.arrayUnion(panel),
+        permissions: panels,
       });
 
     res
@@ -123,6 +123,6 @@ router.post("/assignRole", checkAuth, assignRole);
 router.post("/createRole", checkAuth, createRole);
 router.post("/assignPanelToRole", checkAuth, assignPanelToRole);
 router.get("/getAllRoles", getAllRoles);
-router.get("/getRolePanels", getRolePanels);
+router.get("/getRolePanels", checkAuth, getRolePanels);
 router.get("/getRoles", getRoles);
 module.exports = { roles: router };

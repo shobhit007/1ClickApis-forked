@@ -7,6 +7,11 @@ app.use(express.json());
 
 app.use(cors());
 
+app.use(function (req, res, next) {
+  console.log("url requested", req.originalUrl);
+  return next();
+});
+
 // Admin Auth Routes
 const { auth } = require("./admin/auth/auth");
 app.use("/admin/auth", auth);
