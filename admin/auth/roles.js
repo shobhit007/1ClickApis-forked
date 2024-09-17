@@ -1,32 +1,36 @@
 const express = require("express");
 const { db } = require("../../config/firebase");
-const { FieldValue } = require("firebase-admin/firestore");
 const { checkAuth } = require("../../middlewares/authMiddleware");
-const { firestore } = require("firebase-admin");
 
 const router = express.Router();
 
 const assignRole = async (req, res) => {
-  const role = req.body.role;
-  const email = req.body.email;
+  try {
+    const role = req.body.role;
+    const email = req.body.email;
 
-  const userSnap = await db
-    .collection("users")
-    .doc("internal_users")
-    .collection("credentials")
-    .where("email", "==", email)
-    .get();
+    const userSnap = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .where("email", "==", email)
+      .get();
 
-  const userId = userSnap.docs[0].id;
+    const userId = userSnap.docs[0].id;
 
-  await db
-    .collection("users")
-    .doc("internal_users")
-    .collection("credentials")
-    .doc(userId)
-    .update({ role });
+    await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .doc(userId)
+      .update({ role });
 
-  res.status(200).send("Role assigned successfully");
+    res
+      .status(200)
+      .send({ message: "Role assigned successfully", success: true });
+  } catch (error) {
+    res.status(500).send({ message: error.message, success: false });
+  }
 };
 
 const createRole = async (req, res) => {

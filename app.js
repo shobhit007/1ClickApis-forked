@@ -11,8 +11,12 @@ const { auth } = require("./admin/auth/auth");
 app.use("/admin/auth", auth);
 const { roles } = require("./admin/auth/roles");
 app.use("/admin/roles", roles);
-const form = require("./admin/auth/form");
-app.use("/admin/form", form);
+
+// leads
+const { leads } = require("./admin/leads/leads");
+app.use("/admin/leads", leads);
+const { fbLeads } = require("./admin/leads/fbLeads");
+app.use("/admin/fbLeads", fbLeads);
 
 const PORT = process.env.PORT || 8080;
 
