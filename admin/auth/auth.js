@@ -3,12 +3,19 @@ const { db } = require("../../config/firebase");
 const { Timestamp } = require("@google-cloud/firestore");
 const jwt = require("jsonwebtoken");
 const { checkAuth } = require("../../middlewares/authMiddleware");
+const { generateId } = require("../../utils/utils");
 
 const router = express.Router();
 
 const createAuth = async (req, res) => {
   try {
     const body = req.body;
+
+    if (body.role.includes("sales")) {
+      const salesId = await generateId("sales");
+      body.salesMemberId = salesId;
+    }
+
     await db
       .collection("users")
       .doc("internal_users")

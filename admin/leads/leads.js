@@ -17,11 +17,25 @@ const getLeads = async (req, res) => {
       ? moment(body.endDate).endOf("day").toDate()
       : moment().endOf("day").toDate();
 
-    const snapshot = await db
-      .collection("leads")
-      .where("createdAt", ">=", Timestamp.fromDate(startDate))
-      .where("createdAt", "<=", Timestamp.fromDate(endDate))
-      .get();
+    let leadSnap = null;
+
+    // leads for sales member
+    if (req.role.includes("sales")) {
+      leadSnap = await db
+        .collection("leads")
+        .where("createdAt", ">=", Timestamp.fromDate(startDate))
+        .where("createdAt", "<=", Timestamp.fromDate(endDate))
+        .where("salesExecutive", "==", req.email)
+        .get();
+    } else {
+      //leads for all members
+      leadSnap = await db
+        .collection("leads")
+        .where("createdAt", ">=", Timestamp.fromDate(startDate))
+        .where("createdAt", "<=", Timestamp.fromDate(endDate))
+        .get();
+    }
+
     const leads = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     res.status(200).json({ leads, success: true });
@@ -33,11 +47,16 @@ const getLeads = async (req, res) => {
 // Assign leads to sales member
 const assignLeadsToSalesMember = async (req, res) => {
   try {
-    const leads = req.body.leads;
-    const salesMember = req.body.salesMember;
+    const body = req.body;
+    const leads = body.leads;
+    const salesMember = body.salesMember;
+    const assignedBy = req.email;
+
     for (let lead of leads) {
-      await db.collection("leads").doc(lead).update({
+      await db.collection("leads").doc(`1click${lead}`).update({
         salesExecutive: salesMember,
+        assignedBy: assignedBy,
+        assignedAt: Timestamp.now(),
       });
     }
 

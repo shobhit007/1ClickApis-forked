@@ -3,6 +3,7 @@ const { Timestamp } = require("@google-cloud/firestore");
 const moment = require("moment"); // Add this line
 const router = express.Router();
 const { db } = require("../../config/firebase");
+const { generateId } = require("../../utils/utils");
 
 const fetchFacebookData = async (url) => {
   try {
@@ -163,36 +164,19 @@ const storeFBLeads = async (req, res) => {
 
     // Store each lead in a separate document if it falls within the time range
     if (allLeads.length > 0) {
-      allLeads = allLeads.slice(0, 1);
-
+      // Sort leads by created_time in ascending order
+      allLeads.sort((a, b) => moment(a.created_time) - moment(b.created_time));
       for (let lead of allLeads) {
-        const leadCountSnap = await db.collection("backend").doc("leads").get();
-        const leadCount = leadCountSnap.data().leadCount + 1;
-        const docId = `1click${leadCount}`;
-        console.log("docId", docId);
-        await db
-          .collection("leads")
-          .doc(docId)
-          .set({
-            createdAt: Timestamp.fromDate(moment(lead.created_time)).toDate(),
-            ...lead.field_data,
-          });
-
-        // update leadCount
-        await db.collection("backend").doc("leads").update({
-          leadCount: leadCount,
-        });
+        const leadId = await generateId("lead");
+        const docId = `1click${leadId}`;
+        const leadBody = {
+          createdAt: Timestamp.fromDate(moment(lead.created_time).toDate()),
+          ...lead.field_data,
+          leadId: leadId,
+          stage: "pending",
+        };
+        await db.collection("leads").doc(docId).set(leadBody);
       }
-
-      // const storeLeadsPromises = allLeads.map((lead, index) => {
-      //   const docId = `1click${startIndex + index}`;
-      //   return leadsCollection.doc(docId).set({
-      //     ...lead,
-      //     index: startIndex + index,
-      //   });
-      // });
-
-      // await Promise.all(storeLeadsPromises);
     }
 
     // Update last fetched time
