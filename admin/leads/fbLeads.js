@@ -174,6 +174,7 @@ const storeFBLeads = async (req, res) => {
           ...lead.field_data,
           leadId: leadId,
           stage: "pending",
+          source: "facebook",
         };
         await db.collection("leads").doc(docId).set(leadBody);
       }

@@ -18,6 +18,10 @@ app.use("/admin/leads", leads);
 const { fbLeads } = require("./admin/leads/fbLeads");
 app.use("/admin/fbLeads", fbLeads);
 
+// sales panel
+const { salesPanel } = require("./admin/sales/salesPanel");
+app.use("/admin/sales", salesPanel);
+
 const PORT = process.env.PORT || 8080;
 
 app.listen(PORT, () => {

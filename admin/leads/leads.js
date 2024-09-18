@@ -36,7 +36,7 @@ const getLeads = async (req, res) => {
         .get();
     }
 
-    const leads = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const leads = leadSnap.docs.map((doc) => doc.data());
 
     res.status(200).json({ leads, success: true });
   } catch (error) {
