@@ -2,6 +2,7 @@ const express = require("express");
 const { db } = require("../../config/firebase");
 const { checkAuth } = require("../../middlewares/authMiddleware");
 const { Timestamp } = require("firebase-admin/firestore");
+const moment = require("moment");
 const router = express.Router();
 
 const getSalesMembers = async (req, res) => {
@@ -21,45 +22,44 @@ const getSalesMembers = async (req, res) => {
   }
 };
 
-const addFollowUpDate = async (req, res) => {
+const updateLead = async (req, res) => {
   try {
-    const leadId = req.body.leadId;
-    const date = moment(req.body.date);
+    const body = req.body;
+    const leads = body.leads;
+    const followUpDate = Timestamp.fromDate(moment(body.followUpDate).toDate());
+    body.followUpDate = followUpDate;
 
-    await db
-      .collection("leads")
-      .doc(`1click${leadId}`)
-      .update({
-        followUpDate: Timestamp.fromDate(date.toDate()),
+    const batch = db.batch();
+
+    for (let leadId of leads) {
+      const leadRef = db.collection("leads").doc(`1click${leadId}`);
+      const historyRef = db
+        .collection("leads")
+        .doc(`1click${leadId}`)
+        .collection("history")
+        .doc();
+      delete body.leads;
+      batch.update(leadRef, { ...body, updatedAt: Timestamp.now() });
+      batch.set(historyRef, {
+        ...body,
+        updatedAt: Timestamp.now(),
+        updatedBy: req.email,
+        role: req.role,
       });
+    }
+
+    await batch.commit();
 
     res
       .status(200)
-      .json({ success: true, message: "Follow up date added successfully" });
+      .json({ success: true, message: "Lead updated successfully" });
   } catch (error) {
-    res.status(500).json({ message: error.message, success: false });
-  }
-};
-
-const updateLeadStage = async (req, res) => {
-  try {
-    const leadId = req.body.leadId;
-    const stage = req.body.stage;
-
-    await db.collection("leads").doc(`1click${leadId}`).update({
-      stage: stage,
-    });
-
-    res
-      .status(200)
-      .json({ success: true, message: "Lead stage updated successfully" });
-  } catch (error) {
+    console.log(error);
     res.status(500).json({ message: error.message, success: false });
   }
 };
 
 router.get("/getSalesMembers", checkAuth, getSalesMembers);
-router.post("/addFollowUpDate", checkAuth, addFollowUpDate);
-router.post("/updateLeadStage", checkAuth, updateLeadStage);
+router.post("/updateLead", checkAuth, updateLead);
 
 module.exports = { salesPanel: router };
