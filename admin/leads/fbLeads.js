@@ -126,21 +126,23 @@ const storeFBLeads = async (req, res) => {
           const lead = response.data[i];
           const createdTime = moment(lead.created_time);
           if (createdTime.isAfter(timestamp)) {
-            // Format field_data as a direct object
-            const formattedFieldData = lead.field_data.reduce((acc, field) => {
+            // Flatten field_data directly into the document
+            const leadFields = lead.field_data.reduce((acc, field) => {
               if (field.values && field.values.length > 0) {
-                acc[field.name] = field.values.join(", "); // Combine values into a single string if there are multiple
+                acc[field.name] = field.values.join(", ");
               } else {
-                acc[field.name] = ""; // Default to an empty string if no values
+                acc[field.name] = "";
               }
               return acc;
             }, {});
 
             const formattedLead = {
-              ...lead,
-              field_data: { ...formattedFieldData, adType: formName },
+              created_time: lead.created_time,
+              ...leadFields, // Flattened fields
+              adType: formName,
             };
             leads.push(formattedLead);
+
             if (
               i === response.data.length - 1 &&
               response.paging &&
@@ -160,8 +162,6 @@ const storeFBLeads = async (req, res) => {
 
     await Promise.all(fetchLeadsPromises);
 
-    //   console.log("All Leads:", JSON.stringify(allLeads, null, 2));
-
     // Store each lead in a separate document if it falls within the time range
     if (allLeads.length > 0) {
       // Sort leads by created_time in ascending order
@@ -171,7 +171,7 @@ const storeFBLeads = async (req, res) => {
         const docId = `1click${leadId}`;
         const leadBody = {
           createdAt: Timestamp.fromDate(moment(lead.created_time).toDate()),
-          ...lead.field_data,
+          ...lead, // Spread all lead fields directly into Firestore
           leadId: leadId,
           stage: "pending",
           source: "facebook",
@@ -194,3 +194,4 @@ const storeFBLeads = async (req, res) => {
 router.get("/storeFBLeads", storeFBLeads);
 
 module.exports = { fbLeads: router };
+
