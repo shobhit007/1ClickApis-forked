@@ -18,7 +18,6 @@ const generateId = async (type) => {
     id = count;
   } else if (type === "sales") {
     const salesCountSnap = await db.collection("backend").doc("sales").get();
-
     const count = salesCountSnap?.data()?.salesCount
       ? salesCountSnap?.data()?.salesCount + 1
       : 1;

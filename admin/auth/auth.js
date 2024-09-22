@@ -129,9 +129,34 @@ const updateUser = async (req, res) => {
   }
 };
 
+const getUserDetails = async (req, res) => {
+  try {
+    const email = req.email;
+
+    const userSnap = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .where("email", "==", email)
+      .get();
+
+    if (userSnap.docs.length == 0) {
+      return res
+        .status(404)
+        .send({ message: "User not found", success: false });
+    }
+
+    let userData = userSnap.docs[0].data();
+    return res.status(200).send({ success: true, data: userData });
+  } catch (error) {
+    res.status(500).send({ message: error.message, success: false });
+  }
+};
+
 router.post("/createAuth", checkAuth, createAuth);
 router.post("/login", logIn);
 router.get("/getAllUsers", checkAuth, getAllUsers);
 router.post("/updateUser", checkAuth, updateUser);
+router.get("/getUserDetails", checkAuth, getUserDetails);
 
 module.exports = { auth: router };
