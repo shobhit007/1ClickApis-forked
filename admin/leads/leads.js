@@ -144,9 +144,39 @@ const getUpdateHistoryOfLead = async (req, res) => {
     res.status(500).send({ success: false, message: error.message });
   }
 };
+
+const globalSearch = async (req, res) => {
+  try {
+    const { searchBy, searchText } = req.body;
+    console.log("body in global search", req.body);
+
+    let leadsSnap;
+
+    if (searchBy == "leadId") {
+      leadsSnap = await db
+        .collection("leads")
+        .where("leadId", "==", searchText)
+        .get();
+    } else {
+      leadsSnap = await db
+        .collection("leads")
+        .where("phone_number", "==", searchText)
+        .get();
+    }
+
+    let leads =
+      leadsSnap?.docs.map((item) => ({ id: item.id, ...item.data() })) || [];
+
+    res.status(200).send({ success: true, data: leads });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post("/getLeads", checkAuth, getLeads);
 router.post("/assignLeadsToSalesMember", checkAuth, assignLeadsToSalesMember);
 router.get("/getAllManagers", checkAuth, getAllManagers);
 router.post("/getUpdateHistoryOfLead", checkAuth, getUpdateHistoryOfLead);
+router.post("/globalSearch", checkAuth, globalSearch);
 
 module.exports = { leads: router };
