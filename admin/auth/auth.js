@@ -252,6 +252,15 @@ const getUserDetails = async (req, res) => {
   }
 };
 
+const validateToken = async (req, res) => {
+  try {
+    let decodedData = req.decoded;
+    res.status(200).send({ success: true, data: decodedData });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post("/login", logIn);
 router.post("/createAuth", checkAuth, createAuth);
 router.post("/updateUser", checkAuth, updateUser);
@@ -260,5 +269,6 @@ router.post("/sendEmailOtp", sendEmailOtp);
 router.post("/verifyOtp", verifyOtp);
 router.post("/resetPassword", resetPassword);
 router.get("/getUserDetails", checkAuth, getUserDetails);
+router.get("/validateToken", checkAuth, validateToken);
 
 module.exports = { auth: router };

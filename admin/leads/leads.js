@@ -55,12 +55,15 @@ const assignLeadsToSalesMember = async (req, res) => {
     const assignedBy = req.email;
 
     for (let lead of leads) {
-      await db.collection("leads").doc(`1click${lead}`).update({
-        salesExecutive: salesMember,
-        salesExecutiveName: salesMemberName || null,
-        assignedBy: assignedBy,
-        assignedAt: Timestamp.now(),
-      });
+      await db
+        .collection("leads")
+        .doc(`1click${lead}`)
+        .update({
+          salesExecutive: salesMember,
+          salesExecutiveName: salesMemberName || null,
+          assignedBy: assignedBy,
+          assignedAt: Timestamp.now(),
+        });
     }
 
     res
@@ -118,8 +121,32 @@ const getAllManagers = async (req, res) => {
     res.status(500).send({ success: false, message: error.message });
   }
 };
+
+// get update history of lead
+const getUpdateHistoryOfLead = async (req, res) => {
+  try {
+    const { leadId } = req.body;
+
+    const historySnap = await db
+      .collection("leads")
+      .doc(`1click${leadId}`)
+      .collection("history")
+      .orderBy("updatedAt", "desc")
+      .get();
+
+    const historyData = historySnap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    res.status(200).send({ success: true, data: historyData });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
 router.post("/getLeads", checkAuth, getLeads);
 router.post("/assignLeadsToSalesMember", checkAuth, assignLeadsToSalesMember);
 router.get("/getAllManagers", checkAuth, getAllManagers);
+router.post("/getUpdateHistoryOfLead", checkAuth, getUpdateHistoryOfLead);
 
 module.exports = { leads: router };
