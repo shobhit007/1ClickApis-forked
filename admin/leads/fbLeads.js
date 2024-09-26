@@ -4,6 +4,7 @@ const moment = require("moment"); // Add this line
 const router = express.Router();
 const { db } = require("../../config/firebase");
 const { generateId } = require("../../utils/utils");
+const { FieldValue } = require("firebase-admin/firestore");
 
 const fetchFacebookData = async (url) => {
   try {
@@ -173,7 +174,8 @@ const storeFBLeads = async (req, res) => {
           createdAt: Timestamp.fromDate(moment(lead.created_time).toDate()),
           ...lead, // Spread all lead fields directly into Firestore
           leadId: leadId,
-          stage: "pending",
+          disposition: "Not Open",
+          subDisposition: "Hot Lead",
           source: "facebook",
         };
         await db.collection("leads").doc(docId).set(leadBody);
@@ -191,7 +193,7 @@ const storeFBLeads = async (req, res) => {
     res.status(500).send({ message: error.message });
   }
 };
+
 router.get("/storeFBLeads", storeFBLeads);
 
 module.exports = { fbLeads: router };
-

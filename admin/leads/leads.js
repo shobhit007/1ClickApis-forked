@@ -4,6 +4,7 @@ const { checkAuth } = require("../../middlewares/authMiddleware");
 const moment = require("moment");
 const { Timestamp } = require("firebase-admin/firestore");
 const { userRoles } = require("../../data/commonData");
+const { generateId } = require("../../utils/utils");
 
 const router = express.Router();
 
@@ -144,9 +145,67 @@ const getUpdateHistoryOfLead = async (req, res) => {
     res.status(500).send({ success: false, message: error.message });
   }
 };
+
+const createdManualLead = async (req, res) => {
+  try {
+    const body = req.body;
+    const phone = parseInt(body.phone);
+
+    const snapshot = await db
+      .collection("leads")
+      .where("phone", "==", phone)
+      .get();
+    if (!snapshot.empty) {
+      return res
+        .status(400)
+        .send({ message: "Lead already exists", success: false });
+    }
+
+    const leadCount = await generateId("lead");
+    const leadId = `1click${leadCount}`;
+    const leadBody = {
+      createdAt: Timestamp.fromDate(moment(body.date).toDate()),
+      createdBy: req.email,
+      leadId: leadId,
+      lookingFor: body.lookingFor,
+      companyName: body.companyName,
+      contactPerson: body.contactPerson,
+      phone: phone,
+      altPhone: body.altPhone,
+      email: body.email,
+      city: body.city,
+      requirement: body.requirement,
+      profileScore: body.profileScore,
+      salesMemberId: parseInt(body.salesMember),
+      disposition: body.disposition,
+      subDisposition: body.subDisposition,
+      remarks: body.remarks,
+      source: "manual",
+      adType: "manual",
+    };
+
+    await db.collection("leads").doc(leadId).set(leadBody);
+    await db.collection("leads").doc(leadId).collection("history").doc().set({
+      source: "manual",
+      adType: "manual",
+      updatedAt: Timestamp.now(),
+      updatedBy: req.email,
+      disposition: body.disposition,
+      subDisposition: body.subDisposition,
+    });
+
+    res
+      .status(200)
+      .send({ message: "Lead created successfully", success: true });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post("/getLeads", checkAuth, getLeads);
 router.post("/assignLeadsToSalesMember", checkAuth, assignLeadsToSalesMember);
 router.get("/getAllManagers", checkAuth, getAllManagers);
 router.post("/getUpdateHistoryOfLead", checkAuth, getUpdateHistoryOfLead);
+router.post("/createdManualLead", checkAuth, createdManualLead);
 
 module.exports = { leads: router };
