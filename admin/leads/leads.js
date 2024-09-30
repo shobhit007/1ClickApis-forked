@@ -22,7 +22,7 @@ const getLeads = async (req, res) => {
     let leadSnap = null;
 
     // leads for sales member
-    if (req.role.includes("sales")) {
+    if (req?.role?.includes("sales")) {
       leadSnap = await db
         .collection("leads")
         .where("createdAt", ">=", Timestamp.fromDate(startDate))
@@ -77,31 +77,28 @@ const assignLeadsToSalesMember = async (req, res) => {
 
 // get all managers and their team members
 
-const getAllManagers = async (req, res) => {
+const getAllLeaders = async (req, res) => {
   try {
-    let mangerRoles = userRoles.filter((role) => role.includes("Manager"));
-    console.log("mangerRoles: ", mangerRoles);
-
-    const allMangersSnap = await db
+    const allLeadersSnap = await db
       .collection("users")
       .doc("internal_users")
       .collection("credentials")
-      .where("role", "in", mangerRoles)
+      .where("hierarchy", "==", "teamLead")
       .get();
 
-    const allMangers = allMangersSnap.docs.map((item) => ({
+    const allLeaders = allLeadersSnap.docs.map((item) => ({
       id: item.id,
       ...item.data(),
     }));
 
     let finalData = [];
 
-    for (let manager of allMangers) {
+    for (let leader of allLeaders) {
       let teamMemberSnap = await db
         .collection("users")
         .doc("internal_users")
         .collection("credentials")
-        .where("manager", "==", manager.id)
+        .where("manager", "==", leader.id)
         .get();
 
       let teamMembers = teamMemberSnap.docs.map((item) => ({
@@ -110,9 +107,9 @@ const getAllManagers = async (req, res) => {
       }));
 
       finalData.push({
-        name: manager.name || manager.email,
-        role: manager.role,
-        id: manager.id,
+        name: leader.name || leader.email,
+        role: leader.role,
+        id: leader.id,
         teamMembers,
       });
     }
@@ -232,7 +229,7 @@ const createdManualLead = async (req, res) => {
 
 router.post("/getLeads", checkAuth, getLeads);
 router.post("/assignLeadsToSalesMember", checkAuth, assignLeadsToSalesMember);
-router.get("/getAllManagers", checkAuth, getAllManagers);
+router.get("/getAllLeaders", checkAuth, getAllLeaders);
 router.post("/getUpdateHistoryOfLead", checkAuth, getUpdateHistoryOfLead);
 router.post("/globalSearch", checkAuth, globalSearch);
 router.post("/createdManualLead", checkAuth, createdManualLead);

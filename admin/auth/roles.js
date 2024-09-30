@@ -64,9 +64,12 @@ const assignPanelToRole = async (req, res) => {
       .doc("rolesAndPermissions")
       .collection("roles")
       .doc(role)
-      .update({
-        permissions: panels,
-      });
+      .set(
+        {
+          permissions: panels,
+        },
+        { merge: true }
+      );
 
     res
       .status(200)

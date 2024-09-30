@@ -11,11 +11,10 @@ const router = express.Router();
 const createAuth = async (req, res) => {
   try {
     const body = req.body;
-
-    if (body.role.includes("sales")) {
-      const salesId = await generateId("sales");
-      body.salesMemberId = salesId;
-    }
+    // if (body.role.includes("sales")) {
+    //   const salesId = await generateId("sales");
+    //   body.salesMemberId = salesId;
+    // }
 
     await db
       .collection("users")
@@ -262,7 +261,7 @@ const validateToken = async (req, res) => {
 };
 
 router.post("/login", logIn);
-router.post("/createAuth", checkAuth, createAuth);
+router.post("/createAuth",checkAuth, createAuth);
 router.post("/updateUser", checkAuth, updateUser);
 router.get("/getAllUsers", checkAuth, getAllUsers);
 router.post("/sendEmailOtp", sendEmailOtp);
