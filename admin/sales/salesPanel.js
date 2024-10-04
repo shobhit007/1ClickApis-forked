@@ -59,7 +59,97 @@ const updateLead = async (req, res) => {
   }
 };
 
+const updateBusinessDetails = async (req, res) => {
+  try {
+    const body = req.body;
+    const leadId = body.leadId;
+    delete body.leadId;
+
+    await db
+      .collection("leads")
+      .doc(`1click${leadId}`)
+      .collection("details")
+      .doc("businessDetails")
+      .set(body);
+
+    res.status(200).json({
+      success: true,
+      message: "Business details updated successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message, success: false });
+  }
+};
+const contactDetails = async (req, res) => {
+  try {
+    const body = req.body;
+    const leadId = body.leadId;
+    delete body.leadId;
+
+    await db
+      .collection("leads")
+      .doc(`1click${leadId}`)
+      .collection("details")
+      .doc("contactDetails")
+      .set(body);
+
+    res
+      .status(200)
+      .json({ success: true, message: "Contact details updated successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message, success: false });
+  }
+};
+
+const addProducts = async (req, res) => {
+  try {
+    const body = req.body;
+    const leadId = body.leadId;
+    delete body.leadId;
+
+    await db
+      .collection("leads")
+      .doc(`1click${leadId}`)
+      .collection("products")
+      .add(body);
+
+    res
+      .status(200)
+      .json({ success: true, message: "Products added successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message, success: false });
+  }
+};
+
+const updateProduct = async (req, res) => {
+  try {
+    const body = req.body;
+    const productId = body.productId;
+    const leadId = body.leadId;
+
+    delete body.leadId;
+    delete body.productId;
+
+    await db
+      .collection("leads")
+      .doc(`1click${leadId}`)
+      .collection("products")
+      .doc(productId)
+      .update(body);
+
+    res
+      .status(200)
+      .json({ success: true, message: "Product updated successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message, success: false });
+  }
+};
+
 router.get("/getSalesMembers", checkAuth, getSalesMembers);
 router.post("/updateLead", checkAuth, updateLead);
+router.post("/updateBusinessDetails", checkAuth, updateBusinessDetails);
+router.post("/contactDetails", checkAuth, contactDetails);
+router.post("/addProducts", checkAuth, addProducts);
+router.post("/updateProduct", checkAuth, updateProduct);
 
 module.exports = { salesPanel: router };

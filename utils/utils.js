@@ -29,6 +29,22 @@ const generateId = async (type) => {
       { merge: true }
     );
     id = count;
+  } else if (type === "contract") {
+    const contractCountSnap = await db
+      .collection("backend")
+      .doc("contracts")
+      .get();
+    const count = contractCountSnap?.data()?.contractsCount
+      ? contractCountSnap?.data()?.contractsCount + 1
+      : 1;
+
+    await db.collection("backend").doc("contracts").set(
+      {
+        contractsCount: count,
+      },
+      { merge: true }
+    );
+    id = count;
   }
 
   return id;
