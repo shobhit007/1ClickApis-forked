@@ -33,6 +33,9 @@ const checkAuth = async (req, res, next) => {
 
     req.email = email;
     req.role = role;
+    req.department = decoded.department;
+    req.hierarchy = decoded.hierarchy;
+    req.userId = decoded.userId;
     req.decoded = decoded;
     next();
   } catch (error) {

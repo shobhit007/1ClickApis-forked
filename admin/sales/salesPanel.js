@@ -15,7 +15,6 @@ const getSalesMembers = async (req, res) => {
       .get();
 
     const salesMembers = snapshot.docs.map((doc) => doc.data());
-
     res.status(200).json({ salesMembers, success: true });
   } catch (error) {
     res.status(500).json({ message: error.message, success: false });
@@ -44,7 +43,7 @@ const updateLead = async (req, res) => {
         ...body,
         updatedAt: Timestamp.now(),
         updatedBy: req.email,
-        role: req.role,
+        role: req.role || null,
       });
     }
 

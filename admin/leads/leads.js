@@ -2,9 +2,10 @@ const express = require("express");
 const { db } = require("../../config/firebase");
 const { checkAuth } = require("../../middlewares/authMiddleware");
 const moment = require("moment");
-const { Timestamp } = require("firebase-admin/firestore");
+const { Timestamp, FieldValue } = require("firebase-admin/firestore");
 const { userRoles } = require("../../data/commonData");
 const { generateId } = require("../../utils/utils");
+const { firestore } = require("firebase-admin");
 const multer = require("multer");
 const xlsx = require("xlsx");
 const upload = multer({ storage: multer.memoryStorage() });
@@ -15,6 +16,7 @@ const router = express.Router();
 const getLeads = async (req, res) => {
   try {
     const body = req.body;
+
     const startDate = body.startDate
       ? moment(body.startDate).startOf("day").toDate()
       : moment().startOf("day").toDate();
@@ -24,6 +26,7 @@ const getLeads = async (req, res) => {
 
     let leadSnap = null;
 
+    console.log("req.hierarchy", req.hierarchy);
     // leads for sales member
     if (req?.role?.includes("sales")) {
       leadSnap = await db
@@ -31,6 +34,30 @@ const getLeads = async (req, res) => {
         .where("createdAt", ">=", Timestamp.fromDate(startDate))
         .where("createdAt", "<=", Timestamp.fromDate(endDate))
         .where("salesExecutive", "==", req.email)
+        .get();
+    } else if (req?.hierarchy == "manager") {
+      leadSnap = await db
+        .collection("leads")
+        .where("createdAt", ">=", Timestamp.fromDate(startDate))
+        .where("createdAt", "<=", Timestamp.fromDate(endDate))
+        .where("salesExecutive", "==", null)
+        .get();
+    } else if (req?.hierarchy == "teamLead") {
+      let teamMemberSnap = await db
+        .collection("users")
+        .doc("internal_users")
+        .collection("credentials")
+        .where("leader", "==", req.userId)
+        .get();
+
+      let teamMembers = teamMemberSnap.docs.map((item) => item.id);
+      console.log(teamMembers, "teamMembers");
+
+      leadSnap = await db
+        .collection("leads")
+        .where("createdAt", ">=", Timestamp.fromDate(startDate))
+        .where("createdAt", "<=", Timestamp.fromDate(endDate))
+        .where("salesExecutive", "in", teamMembers)
         .get();
     } else {
       //leads for all members
@@ -41,9 +68,31 @@ const getLeads = async (req, res) => {
         .get();
     }
 
+    // set the name of the salesmember and assigned by user from their unique id
     const leads = leadSnap.docs.map((doc) => doc.data());
+    const usersSnap = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .get();
+    const users = usersSnap.docs.map((doc) => doc.data());
 
-    res.status(200).json({ leads, success: true });
+    let modifiedLeads = [];
+
+    for (let lead of leads) {
+      if (lead?.salesExecutive) {
+        let salesUser = users.find((user) => user.id == lead.salesExecutive);
+        lead.salesExecutiveName = salesUser.name;
+      }
+      if (lead?.assignedBy) {
+        let assignedByUser = users.find((user) => user.id == lead?.assignedBy);
+        lead.assignedBy = assignedByUser?.name || null;
+      }
+
+      modifiedLeads.push(lead);
+    }
+
+    res.status(200).json({ leads: modifiedLeads, success: true });
   } catch (error) {
     res.status(500).json({ message: error.message, success: false });
   }
@@ -55,19 +104,14 @@ const assignLeadsToSalesMember = async (req, res) => {
     const body = req.body;
     const leads = body.leads;
     const salesMember = body.salesMember;
-    const salesMemberName = body.salesMemberName;
-    const assignedBy = req.email;
+    const assignedBy = req.userId || null;
 
     for (let lead of leads) {
-      await db
-        .collection("leads")
-        .doc(`1click${lead}`)
-        .update({
-          salesExecutive: salesMember,
-          salesExecutiveName: salesMemberName || null,
-          assignedBy: assignedBy,
-          assignedAt: Timestamp.now(),
-        });
+      await db.collection("leads").doc(`1click${lead}`).update({
+        salesExecutive: salesMember,
+        assignedBy: assignedBy,
+        assignedAt: Timestamp.now(),
+      });
     }
 
     res
@@ -80,42 +124,45 @@ const assignLeadsToSalesMember = async (req, res) => {
 
 // get all managers and their team members
 
-const getAllLeaders = async (req, res) => {
+const getSalesTeamMembers = async (req, res) => {
   try {
-    const allLeadersSnap = await db
+    const salesDeptMembersSnap = await db
       .collection("users")
       .doc("internal_users")
       .collection("credentials")
-      .where("hierarchy", "==", "teamLead")
+      .where("department", "==", "sales")
       .get();
 
-    const allLeaders = allLeadersSnap.docs.map((item) => ({
+    const users = salesDeptMembersSnap.docs.map((item) => ({
       id: item.id,
       ...item.data(),
     }));
 
-    let finalData = [];
+    const userMap = {};
 
-    for (let leader of allLeaders) {
-      let teamMemberSnap = await db
-        .collection("users")
-        .doc("internal_users")
-        .collection("credentials")
-        .where("manager", "==", leader.id)
-        .get();
+    users.forEach((user) => {
+      userMap[user.id] = { ...user, teamMembers: [] };
+    });
 
-      let teamMembers = teamMemberSnap.docs.map((item) => ({
-        id: item.id,
-        ...item.data(),
-      }));
+    const result = [];
+    const orphans = [];
+    users.forEach((user) => {
+      if (user.senior) {
+        if (userMap[user.senior]) {
+          userMap[user.senior].teamMembers.push(userMap[user.id]);
+        }
+      } else {
+        result.push(userMap[user.id]);
+      }
+    });
 
-      finalData.push({
-        name: leader.name || leader.email,
-        role: leader.role,
-        id: leader.id,
-        teamMembers,
-      });
-    }
+    users.forEach((user) => {
+      if (!user.senior && userMap[user.id].teamMembers.length === 0) {
+        orphans.push(userMap[user.id]);
+      }
+    });
+
+    let finalData = [...result, ...orphans];
 
     res.status(200).send({ success: true, data: finalData });
   } catch (error) {
@@ -156,12 +203,17 @@ const globalSearch = async (req, res) => {
     if (searchBy == "leadId") {
       leadsSnap = await db
         .collection("leads")
-        .where("leadId", "==", searchText)
+        .where("leadId", "==", parseInt(searchText))
+        .get();
+    } else if (searchBy == "companyName") {
+      leadsSnap = await db
+        .collection("leads")
+        .where("company_name", "==", searchText)
         .get();
     } else {
       leadsSnap = await db
         .collection("leads")
-        .where("phone_number", "==", searchText)
+        .where("phone_number", "==", parseInt(searchText))
         .get();
     }
 
@@ -227,6 +279,65 @@ const createdManualLead = async (req, res) => {
       .send({ message: "Lead created successfully", success: true });
   } catch (error) {
     res.status(500).send({ success: false, message: error.message });
+  }
+};
+
+const manupulateLeads = async (req, res) => {
+  try {
+    const leads = await db.collection("leads").get();
+
+    const leadsData = leads.docs.map((item) => item.id);
+
+    let batch = db.batch();
+    let ref = db.collection("leads");
+
+    for (let lead of leadsData) {
+      let docRef = ref.doc(lead);
+      batch.update(docRef, {
+        salesExecutiveName: FieldValue.delete(),
+        salesExecutive: FieldValue.delete(),
+      });
+    }
+
+    await batch.commit();
+
+    res.send("ok");
+  } catch (error) {
+    res.send(error.message);
+  }
+};
+
+const manipulateUsers = async (req, res) => {
+  try {
+    const usersSnap = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .get();
+
+    const users = usersSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+
+    const ref = db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials");
+    const batch = db.batch();
+    for (let i = 0; i < users.length; i++) {
+      let user = users[i];
+      const docId = user.id;
+      delete user.id;
+
+      let newId = `1CDI${i + 1}`;
+      user.id = newId;
+      console.log("user is", user);
+      batch.set(ref.doc(newId), user);
+      batch.delete(ref.doc(docId));
+    }
+
+    await batch.commit();
+    res.send("ok");
+  } catch (error) {
+    res.send(error.message);
   }
 };
 
@@ -366,10 +477,11 @@ router.post(
 );
 router.post("/getLeads", checkAuth, getLeads);
 router.post("/assignLeadsToSalesMember", checkAuth, assignLeadsToSalesMember);
-router.get("/getAllLeaders", checkAuth, getAllLeaders);
+router.get("/getSalesTeamMembers", checkAuth, getSalesTeamMembers);
 router.post("/getUpdateHistoryOfLead", checkAuth, getUpdateHistoryOfLead);
 router.post("/globalSearch", checkAuth, globalSearch);
 router.post("/createdManualLead", checkAuth, createdManualLead);
 router.post("/getLeadDetails", checkAuth, getLeadDetails);
+router.post("/manupulateLeads", manupulateLeads);
 
 module.exports = { leads: router };

@@ -11,17 +11,14 @@ const router = express.Router();
 const createAuth = async (req, res) => {
   try {
     const body = req.body;
-    // if (body.role.includes("sales")) {
-    //   const salesId = await generateId("sales");
-    //   body.salesMemberId = salesId;
-    // }
+    let id = await generateId("internal_user");
 
     await db
       .collection("users")
       .doc("internal_users")
       .collection("credentials")
-      .doc()
-      .set({ ...body, createdAt: Timestamp.now() });
+      .doc(`1CDI${id}`)
+      .set({ ...body, id: `1CDI${id}`, createdAt: Timestamp.now() });
 
     res
       .status(200)
@@ -68,11 +65,14 @@ const logIn = async (req, res) => {
     const jwtPayload = {
       email: user.email,
       name: user.name,
+      department: user.department,
+      hierarchy: user.hierarchy,
+      userId: userSnap.docs[0].id,
     };
 
-    if (user.role) {
-      jwtPayload.role = user.role;
-    }
+    // if (user.role) {
+    //   jwtPayload.role = user.role;
+    // }
 
     const token = jwt.sign(jwtPayload, process.env.JWT_SECRET, {
       expiresIn: "1d",
@@ -92,8 +92,21 @@ const getAllUsers = async (req, res) => {
       .doc("internal_users")
       .collection("credentials")
       .get();
+
+    const allUsers = users.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+
+    let modifiedUsers = allUsers.map((user) => {
+      let obj = { ...user };
+      if (obj?.senior) {
+        console.log("found senior for", obj.name);
+        let seniorData = allUsers.find((item) => item.id == obj.senior);
+        obj.seniorName = seniorData?.name || seniorData?.email || null;
+      }
+      return obj;
+    });
+
     res.status(200).send({
-      users: users.docs.map((doc) => ({ ...doc.data(), id: doc.id })),
+      users: modifiedUsers,
       success: true,
     });
   } catch (error) {
@@ -261,9 +274,9 @@ const validateToken = async (req, res) => {
 };
 
 router.post("/login", logIn);
-router.post("/createAuth",checkAuth, createAuth);
+router.post("/createAuth", checkAuth, createAuth);
 router.post("/updateUser", checkAuth, updateUser);
-router.get("/getAllUsers", checkAuth, getAllUsers);
+router.get("/getAllUsers", getAllUsers);
 router.post("/sendEmailOtp", sendEmailOtp);
 router.post("/verifyOtp", verifyOtp);
 router.post("/resetPassword", resetPassword);

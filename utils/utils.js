@@ -45,6 +45,22 @@ const generateId = async (type) => {
       { merge: true }
     );
     id = count;
+  } else if (type == "internal_user") {
+    const internalUserSnap = await db
+      .collection("backend")
+      .doc("internalUser")
+      .get();
+    const count = internalUserSnap?.data()?.internalMembersCount
+      ? internalUserSnap?.data()?.internalMembersCount + 1
+      : 1;
+
+    await db.collection("backend").doc("internalUser").set(
+      {
+        internalMembersCount: count,
+      },
+      { merge: true }
+    );
+    id = count;
   }
 
   return id;
