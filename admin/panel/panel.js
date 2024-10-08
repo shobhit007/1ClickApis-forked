@@ -35,11 +35,48 @@ const getAllColumnsForSalesPanel = async (req, res) => {
   }
 };
 
+const saveImageLinkForLoginPage = async (req, res) => {
+  try {
+    const { imageLink } = req.body;
+    if (!imageLink)
+      return res
+        .status(404)
+        .send({ success: false, message: "No image link found!" });
+
+    await db
+      .collection("backend")
+      .doc("images")
+      .set({ loginBg: imageLink }, { merge: true });
+
+    res
+      .status(200)
+      .send({ success: true, message: "Successfully saved image!" });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
+const getLoginPageImageLink = async (req, res) => {
+  try {
+    let dataSnpa = await db.collection("backend").doc("images").get();
+    let data = dataSnpa.data();
+
+    console.log("data is", data);
+    res.status(200).send({ success: true, link: data?.loginBg || null });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post(
   "/updateColumnsForSalesPanel",
   checkAuth,
   updateColumnsForSalesPanel
 );
+
+
 router.get("/getAllColumnsForSalesPanel", getAllColumnsForSalesPanel);
+router.post("/saveImageLinkForLoginPage", checkAuth, saveImageLinkForLoginPage);
+router.get("/getLoginPageImageLink", getLoginPageImageLink);
 
 module.exports = { panel: router };

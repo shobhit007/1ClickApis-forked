@@ -66,6 +66,19 @@ const generateId = async (type) => {
   return id;
 };
 
+function getTeamMembersOfUser(userId, users) {
+  function findTeamMembers(seniorId) {
+    const directMembers = users.filter((user) => user.senior === seniorId);
+    const allTeamMembers = directMembers.reduce((team, member) => {
+      return team.concat([member], findTeamMembers(member.id));
+    }, []);
+
+    return allTeamMembers;
+  }
+  return findTeamMembers(userId);
+}
+
 module.exports = {
   generateId,
+  getTeamMembersOfUser,
 };

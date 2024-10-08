@@ -4,7 +4,7 @@ const { checkAuth } = require("../../middlewares/authMiddleware");
 const moment = require("moment");
 const { Timestamp, FieldValue } = require("firebase-admin/firestore");
 const { userRoles } = require("../../data/commonData");
-const { generateId } = require("../../utils/utils");
+const { generateId, getTeamMembersOfUser } = require("../../utils/utils");
 const { firestore } = require("firebase-admin");
 const multer = require("multer");
 const xlsx = require("xlsx");
@@ -144,7 +144,7 @@ const getSalesTeamMembers = async (req, res) => {
       userMap[user.id] = { ...user, teamMembers: [] };
     });
 
-    const result = [];
+    let result = [];
     const orphans = [];
     users.forEach((user) => {
       if (user.senior) {
@@ -157,9 +157,18 @@ const getSalesTeamMembers = async (req, res) => {
     });
 
     users.forEach((user) => {
-      if (!user.senior && userMap[user.id].teamMembers.length === 0) {
+      if (
+        (!user?.senior || user?.seniour == "") &&
+        userMap[user.id].teamMembers.length === 0
+      ) {
         orphans.push(userMap[user.id]);
       }
+    });
+
+    result = result.filter((item) => {
+      let found = orphans.find((i) => i.id == item.id);
+
+      return !found;
     });
 
     let finalData = [...result, ...orphans];
@@ -470,6 +479,71 @@ const getLeadDetails = async (req, res) => {
   }
 };
 
+const getLeadsForSalesPanel = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // getting all the internal user to filterout the member of the current user's team
+    const allUsersSnap = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .get();
+
+    const allUsers = allUsersSnap.docs.map((item) => item.data());
+
+    // filter the team members
+    const getTeamMembers = await getTeamMembersOfUser(userId, allUsers);
+    let allTeamMemberIds = [];
+
+    console.log("req.hierarchy is", req.hierarchy);
+    // extract the ids of all the team members including user'
+    if (req.hierarchy == "superAdmin") {
+      allTeamMemberIds = allUsers?.map((user) => user.id);
+    } else {
+      if (Array.isArray(getTeamMembers)) {
+        allTeamMemberIds = getTeamMembers?.map((user) => user.id);
+      }
+      allTeamMemberIds.push(userId);
+    }
+
+    // getting the assigned lead to all the team member of user
+    let allLeads = [];
+    console.log("allTeamMemberIds", allTeamMemberIds);
+    for (let teamMemberId of allTeamMemberIds) {
+      const snap = await db
+        .collection("leads")
+        .where("salesExecutive", "==", teamMemberId)
+        .get();
+
+      let snapData = snap.docs.map((doc) => doc.data());
+
+      // here add the name of the sales executive and assigned by user's
+      snapData = snapData.map((lead) => {
+        if (lead?.salesExecutive) {
+          let salesUser = allUsers.find(
+            (user) => user.id == lead.salesExecutive
+          );
+          lead.salesExecutiveName = salesUser?.name;
+        }
+        if (lead?.assignedBy) {
+          let assignedByUser = allUsers.find(
+            (user) => user.id == lead?.assignedBy
+          );
+          lead.assignedBy = assignedByUser?.name || null;
+        }
+        return lead;
+      });
+
+      allLeads = [...allLeads, ...snapData];
+    }
+
+    res.status(200).send({ success: true, leads: allLeads });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post(
   "/importLeadsFromExcel",
   upload.single("file"),
@@ -483,5 +557,6 @@ router.post("/globalSearch", checkAuth, globalSearch);
 router.post("/createdManualLead", checkAuth, createdManualLead);
 router.post("/getLeadDetails", checkAuth, getLeadDetails);
 router.post("/manupulateLeads", manupulateLeads);
+router.post("/getLeadsForSalesPanel", checkAuth, getLeadsForSalesPanel);
 
 module.exports = { leads: router };
