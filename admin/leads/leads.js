@@ -82,7 +82,7 @@ const getLeads = async (req, res) => {
     for (let lead of leads) {
       if (lead?.salesExecutive) {
         let salesUser = users.find((user) => user.id == lead.salesExecutive);
-        lead.salesExecutiveName = salesUser.name;
+        lead.salesExecutiveName = salesUser?.name || null;
       }
       if (lead?.assignedBy) {
         let assignedByUser = users.find((user) => user.id == lead?.assignedBy);
@@ -481,6 +481,14 @@ const getLeadDetails = async (req, res) => {
 
 const getLeadsForSalesPanel = async (req, res) => {
   try {
+    const { endDate, startDate } = req.body;
+
+    let start = moment(startDate).startOf("day").toDate();
+    let end = moment(endDate).endOf("day").toDate();
+
+    let stampStart = Timestamp.fromDate(start);
+    let stampEnd = Timestamp.fromDate(end);
+
     const userId = req.userId;
 
     // getting all the internal user to filterout the member of the current user's team
@@ -489,9 +497,7 @@ const getLeadsForSalesPanel = async (req, res) => {
       .doc("internal_users")
       .collection("credentials")
       .get();
-
     const allUsers = allUsersSnap.docs.map((item) => item.data());
-
     // filter the team members
     const getTeamMembers = await getTeamMembersOfUser(userId, allUsers);
     let allTeamMemberIds = [];
@@ -544,6 +550,79 @@ const getLeadsForSalesPanel = async (req, res) => {
   }
 };
 
+const getDataForDashboard = async (req, res) => {
+  try {
+    const { endDate, startDate } = req.body;
+    let start = moment(startDate).startOf("day").toDate();
+    let end = moment(endDate).endOf("day").toDate();
+
+    // convert date to timestamp
+    let stampStart = Timestamp.fromDate(start);
+    let stampEnd = Timestamp.fromDate(end);
+
+    const userId = req.userId;
+
+    // getting all the internal user to filterout the member of the current user's team
+    const allUsersSnap = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .get();
+    const allUsers = allUsersSnap.docs.map((item) => item.data());
+
+    // filter the team members
+    const getTeamMembers = await getTeamMembersOfUser(userId, allUsers);
+    let allTeamMemberIds = [];
+
+    console.log("req.hierarchy is", req.hierarchy);
+    // extract the ids of all the team members including user'
+    if (req.hierarchy == "superAdmin") {
+      allTeamMemberIds = allUsers?.map((user) => user.id);
+    } else {
+      if (Array.isArray(getTeamMembers)) {
+        allTeamMemberIds = getTeamMembers?.map((user) => user.id);
+      }
+      allTeamMemberIds.push(userId);
+    }
+
+    // getting the assigned lead to all the team member of user
+    let allLeads = [];
+    console.log("allTeamMemberIds", allTeamMemberIds);
+    for (let teamMemberId of allTeamMemberIds) {
+      const snap = await db
+        .collection("leads")
+        .where("updatedAt", ">=", stampStart)
+        .where("updatedAt", "<=", stampEnd)
+        .where("salesExecutive", "==", teamMemberId)
+        .get();
+
+      let snapData = snap.docs.map((doc) => doc.data());
+      // here add the name of the sales executive and assigned by user's
+      snapData = snapData.map((lead) => {
+        if (lead?.salesExecutive) {
+          let salesUser = allUsers.find(
+            (user) => user.id == lead.salesExecutive
+          );
+          lead.salesExecutiveName = salesUser?.name;
+        }
+        if (lead?.assignedBy) {
+          let assignedByUser = allUsers.find(
+            (user) => user.id == lead?.assignedBy
+          );
+          lead.assignedBy = assignedByUser?.name || null;
+        }
+        return lead;
+      });
+
+      allLeads = [...allLeads, ...snapData];
+    }
+
+    res.status(200).send({ success: true, leads: allLeads });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post(
   "/importLeadsFromExcel",
   upload.single("file"),
@@ -558,5 +637,6 @@ router.post("/createdManualLead", checkAuth, createdManualLead);
 router.post("/getLeadDetails", checkAuth, getLeadDetails);
 router.post("/manupulateLeads", manupulateLeads);
 router.post("/getLeadsForSalesPanel", checkAuth, getLeadsForSalesPanel);
+router.post("/getDataForDashboard", checkAuth, getDataForDashboard);
 
 module.exports = { leads: router };

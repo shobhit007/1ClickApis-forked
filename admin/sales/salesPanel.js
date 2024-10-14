@@ -27,10 +27,11 @@ const updateLead = async (req, res) => {
     const leads = body.leads;
     const followUpDate = Timestamp.fromDate(moment(body.followUpDate).toDate());
     body.followUpDate = followUpDate;
+    const leadId = body.leadId;
 
     const batch = db.batch();
 
-    for (let leadId of leads) {
+    // for (let leadId of leads) {
       const leadRef = db.collection("leads").doc(`1click${leadId}`);
       const historyRef = db
         .collection("leads")
@@ -45,7 +46,7 @@ const updateLead = async (req, res) => {
         updatedBy: req.email,
         role: req.role || null,
       });
-    }
+    // }
 
     await batch.commit();
 
