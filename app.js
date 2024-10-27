@@ -31,7 +31,7 @@ app.use("/admin/sales", salesPanel);
 const { panel } = require("./admin/panel/panel");
 app.use("/admin/panel", panel);
 
-const PORT = process.env.PORT || 8080;
+const PORT = parseInt(process.env.PORT) || 8080;
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
