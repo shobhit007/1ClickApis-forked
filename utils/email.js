@@ -14,7 +14,7 @@ const sendEmail = async ({ email, subject, text }) => {
     Messages: [
       {
         From: {
-          Email: "shobhitsaini709@gmail.com",
+          Email: "1clickdistributors.tech@gmail.com",
           Name: "1Click Distribution",
         },
         To: [
