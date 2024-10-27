@@ -4,7 +4,12 @@ const { checkAuth } = require("../../middlewares/authMiddleware");
 const moment = require("moment");
 const { Timestamp, FieldValue } = require("firebase-admin/firestore");
 const { userRoles } = require("../../data/commonData");
-const { generateId, getTeamMembersOfUser } = require("../../utils/utils");
+const {
+  generateId,
+  getTeamMembersOfUser,
+  getLeadsStats,
+  generateSerialNumber,
+} = require("../../utils/utils");
 const { firestore } = require("firebase-admin");
 const multer = require("multer");
 const xlsx = require("xlsx");
@@ -104,13 +109,23 @@ const assignLeadsToSalesMember = async (req, res) => {
     const body = req.body;
     const leads = body.leads;
     const salesMember = body.salesMember;
-    const assignedBy = req.userId || null;
+    const salesMemberName = body.salesMemberName || null;
+    let assignedBy = req.userId || null;
+
+    const snapshot = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .doc(assignedBy)
+      .get();
+    const userData = snapshot.data();
 
     for (let lead of leads) {
       await db.collection("leads").doc(`1click${lead}`).update({
         salesExecutive: salesMember,
-        assignedBy: assignedBy,
+        assignedBy: userData.name,
         assignedAt: Timestamp.now(),
+        salesExecutiveName: salesMemberName,
       });
     }
 
@@ -250,38 +265,51 @@ const createdManualLead = async (req, res) => {
         .send({ message: "Lead already exists", success: false });
     }
 
-    const leadCount = await generateId("lead");
-    const leadId = `1click${leadCount}`;
+    const leadId = await generateId("lead");
+    const docId = `1click${leadId}`;
+    const profileId = generateSerialNumber(`1CD${leadId}`);
+
     const leadBody = {
+      profileId,
       createdAt: Timestamp.fromDate(moment(body.date).toDate()),
-      createdBy: req.email,
+      createdBy: req.userId,
       leadId: leadId,
-      lookingFor: body.lookingFor,
-      companyName: body.companyName,
-      contactPerson: body.contactPerson,
-      phone: phone,
-      altPhone: body.altPhone,
+      looking_for: body.lookingFor,
+      company_name: body.companyName,
+      full_name: body.contactPerson,
+      phone_number: phone,
+      altPhoneNumber: body.altPhone,
       email: body.email,
       city: body.city,
-      requirement: body.requirement,
+      ["whats_is_your_requirement_?_write_in_brief"]: body.requirement,
       profileScore: body.profileScore,
-      salesMemberId: parseInt(body.salesMember),
+      salesExecutive: body.salesMember.id,
       disposition: body.disposition,
       subDisposition: body.subDisposition,
       remarks: body.remarks,
       source: "manual",
       adType: "manual",
+      assignedAt: Timestamp.now(),
+      assignedBy: req.userId,
+      followUpDate: Timestamp.fromDate(moment(body.followUpDate).toDate()),
+      updatedAt: Timestamp.now(),
     };
 
-    await db.collection("leads").doc(leadId).set(leadBody);
-    await db.collection("leads").doc(leadId).collection("history").doc().set({
-      source: "manual",
-      adType: "manual",
-      updatedAt: Timestamp.now(),
-      updatedBy: req.email,
-      disposition: body.disposition,
-      subDisposition: body.subDisposition,
-    });
+    await db.collection("leads").doc(docId).set(leadBody);
+    await db
+      .collection("leads")
+      .doc(docId)
+      .collection("history")
+      .doc()
+      .set({
+        updatedAt: Timestamp.now(),
+        updatedBy: req.userId,
+        disposition: body.disposition,
+        subDisposition: body.subDisposition,
+        followUpDate: Timestamp.fromDate(moment(body.followUpDate).toDate()),
+        hierarchy: req.hierarchy,
+        remarks: body.remarks,
+      });
 
     res
       .status(200)
@@ -363,50 +391,72 @@ const importLeadsFromExcel = async (req, res) => {
     const sheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(sheet);
 
-    console.log("data", data);
-
     const batch = db.batch();
 
-    // for (let row of data) {
-    //   const leadCount = await generateId("lead");
-    //   const leadId = `1click${leadCount}`;
+    for (let row of data) {
+      const leadCount = await generateId("lead");
+      const leadId = `1click${leadCount}`;
 
-    //   const leadBody = {
-    //     createdAt: Timestamp.now(),
-    //     createdBy: req.email,
-    //     leadId: leadId,
-    //     lookingFor: row.lookingFor || '',
-    //     companyName: row.companyName || '',
-    //     contactPerson: row.contactPerson || '',
-    //     phone: row.phone || '',
-    //     altPhone: row.altPhone || '',
-    //     email: row.email || '',
-    //     city: row.city || '',
-    //     requirement: row.requirement || '',
-    //     profileScore: row.profileScore || 0,
-    //     salesMemberId: parseInt(row.salesMember) || 0,
-    //     disposition: row.disposition || '',
-    //     subDisposition: row.subDisposition || '',
-    //     remarks: row.remarks || '',
-    //     source: "excel_import",
-    //     adType: "manual",
-    //   };
+      const salesExecutiveEmail = row["User Mail Id"];
+      if (salesExecutiveEmail) {
+        const salesMemberSnap = await db
+          .collection("users")
+          .doc("internal_users")
+          .collection("credentials")
+          .where("email", "==", salesExecutiveEmail)
+          .get();
 
-    //   const leadRef = db.collection("leads").doc(leadId);
-    //   batch.set(leadRef, leadBody);
+        if (!salesMemberSnap.empty) {
+          const salesMember = salesMemberSnap.docs.map((item) => ({
+            id: item.id,
+            ...item.data(),
+          }))[0];
 
-    //   const historyRef = leadRef.collection("history").doc();
-    //   batch.set(historyRef, {
-    //     source: "excel_import",
-    //     adType: "manual",
-    //     updatedAt: Timestamp.now(),
-    //     updatedBy: req.email,
-    //     disposition: row.disposition || '',
-    //     subDisposition: row.subDisposition || '',
-    //   });
-    // }
+          row.salesMember = salesMember.id;
+        } else {
+          row.salesMember = null;
+        }
+      }
 
-    // await batch.commit();
+      const leadBody = {
+        createdAt: Timestamp.fromDate(
+          moment(row.Date, "'DD/MM/YYYY'").toDate()
+        ),
+        createdBy: req.userId,
+        leadId: leadCount,
+        profileId: generateSerialNumber(`1CD${leadCount}`),
+        lookingFor: row["Looking For"] || "NA",
+        companyName: row["Company Name"] || "NA",
+        full_name: row["Contact Person"] || "NA",
+        phone_number: row["Contact Number"] || "NA",
+        altPhone: row.altPhone || "NA",
+        email: row["Mail Id"] || "NA",
+        city: row.City || "",
+        ["whats_is_your_requirement_?_write_in_brief"]: row.Query || "",
+        profileScore: row.profileScore || "NA",
+        disposition: row.Disposition || "NA",
+        subDisposition: row["Sub Disposition"] || "NA",
+        remarks: row.remarks || "NA",
+        source: "excel_import",
+        adType: "manual",
+      };
+
+      if (row.salesMember) {
+        leadBody.salesExecutive = row.salesMember;
+        leadBody.assignedAt = Timestamp.fromDate(
+          moment(row.Date, "'DD/MM/YYYY'").toDate()
+        );
+        leadBody.assignedBy = req.userId;
+        leadBody.updatedAt = Timestamp.fromDate(
+          moment(row.Date, "'DD/MM/YYYY'").toDate()
+        );
+      }
+
+      const leadRef = db.collection("leads").doc(leadId);
+      batch.set(leadRef, leadBody);
+    }
+
+    await batch.commit();
 
     res
       .status(200)
@@ -423,7 +473,19 @@ const getLeadDetails = async (req, res) => {
     const leadId = body.leadId;
 
     const leadSnap = await db.collection("leads").doc(`1click${leadId}`).get();
-    const leadData = leadSnap.data();
+    let leadData = leadSnap.data();
+
+    if (!leadData.salesMemberName && leadData.salesExecutive) {
+      const salesSnap = await db
+        .collection("users")
+        .doc("internal_users")
+        .collection("credentials")
+        .doc(leadData.salesExecutive)
+        .get();
+
+      const memberData = salesSnap.data();
+      leadData.salesMemberName = memberData.name;
+    }
 
     const detailsSnap = await db
       .collection("leads")
@@ -435,23 +497,21 @@ const getLeadDetails = async (req, res) => {
       contact: {},
     };
     if (!detailsSnap.empty) {
-      leadDetails = detailsSnap.docs.map((item) => ({
+      const details = detailsSnap.docs.map((item) => ({
         id: item.id,
         ...item.data(),
       }));
-      leadDetails.business = leadDetails.find(
-        (item) => item.id === "businessDetails"
-      );
-      leadDetails.contact = leadDetails.find(
-        (item) => item.id === "contactDetails"
-      );
+      leadDetails.business =
+        details.find((item) => item.id === "businessDetails") || {};
+      leadDetails.contact =
+        details.find((item) => item.id === "contactDetails") || {};
     }
 
     const historySnap = await db
       .collection("leads")
       .doc(`1click${leadId}`)
       .collection("history")
-      .orderBy("updatedAt", "desc")
+      .orderBy("followUpDate", "asc")
       .get();
 
     const historyData = historySnap.docs.map((item) => ({
@@ -475,13 +535,18 @@ const getLeadDetails = async (req, res) => {
       data: { leadData, leadDetails, historyData, products },
     });
   } catch (error) {
+    console.log(error);
     res.status(500).send({ success: false, message: error.message });
   }
 };
 
 const getLeadsForSalesPanel = async (req, res) => {
   try {
-    const { endDate, startDate } = req.body;
+    const body = req.body;
+    console.log("body", body);
+    const startDate = body.startDate;
+    const endDate = body.endDate;
+    const myData = body.myData;
 
     let start = moment(startDate).startOf("day").toDate();
     let end = moment(endDate).endOf("day").toDate();
@@ -502,7 +567,6 @@ const getLeadsForSalesPanel = async (req, res) => {
     const getTeamMembers = await getTeamMembersOfUser(userId, allUsers);
     let allTeamMemberIds = [];
 
-    console.log("req.hierarchy is", req.hierarchy);
     // extract the ids of all the team members including user'
     if (req.hierarchy == "superAdmin") {
       allTeamMemberIds = allUsers?.map((user) => user.id);
@@ -515,12 +579,33 @@ const getLeadsForSalesPanel = async (req, res) => {
 
     // getting the assigned lead to all the team member of user
     let allLeads = [];
-    console.log("allTeamMemberIds", allTeamMemberIds);
     for (let teamMemberId of allTeamMemberIds) {
-      const snap = await db
-        .collection("leads")
-        .where("salesExecutive", "==", teamMemberId)
-        .get();
+      let snap = [];
+
+      if (myData) {
+        snap = await db
+          .collection("leads")
+          .where("salesExecutive", "==", teamMemberId)
+          .get();
+      } else {
+        snap = await db
+          .collection("leads")
+          .where("assignedAt", ">=", stampStart)
+          .where("assignedAt", "<=", stampEnd)
+          .where("salesExecutive", "==", teamMemberId)
+          .get();
+
+        // Today follow updates
+        const followUpdateSnap = await db
+          .collection("leads")
+          .where("followUpDate", ">=", stampStart)
+          .where("followUpDate", "<=", stampEnd)
+          .where("salesExecutive", "==", teamMemberId)
+          .get();
+
+        const followUpLeads = followUpdateSnap.docs.map((doc) => doc.data());
+        allLeads.push(...followUpLeads);
+      }
 
       let snapData = snap.docs.map((doc) => doc.data());
 
@@ -550,11 +635,105 @@ const getLeadsForSalesPanel = async (req, res) => {
   }
 };
 
+// Get all sales team members updated leads of today
+const getUpdatedLeadsCount = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // getting all the internal user to filterout the member of the current user's team
+    const allUsersSnap = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .get();
+
+    const allUsers = allUsersSnap.docs.map((item) => item.data());
+
+    // filter the team members
+    const getTeamMembers = await getTeamMembersOfUser(userId, allUsers);
+    let allTeamMemberIds = [];
+
+    // extract the ids of all the team members including user'
+    if (req.hierarchy == "superAdmin") {
+      allTeamMemberIds = allUsers?.map((user) => user.id);
+    } else {
+      if (Array.isArray(getTeamMembers)) {
+        allTeamMemberIds = getTeamMembers?.map((user) => user.id);
+      }
+      allTeamMemberIds.push(userId);
+    }
+
+    const data = [];
+    for (let memberId of allTeamMemberIds) {
+      const snap = await db
+        .collection("users")
+        .doc("internal_users")
+        .collection("credentials")
+        .doc(memberId)
+        .get();
+
+      const memberData = snap.data();
+
+      const memberLeadsData = await getLeadsStats(memberId);
+
+      data.push({ ...memberData, leadCounts: memberLeadsData });
+    }
+
+    res.status(200).send({ success: true, data });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
+// Get all allocated leads
+const getAllAllocatedLeads = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // getting all the internal user to filterout the member of the current user's team
+    const allUsersSnap = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .get();
+
+    const allUsers = allUsersSnap.docs.map((item) => item.data());
+
+    // filter the team members
+    const getTeamMembers = await getTeamMembersOfUser(userId, allUsers);
+    let allTeamMemberIds = [];
+
+    // extract the ids of all the team members including user'
+    if (req.hierarchy == "superAdmin") {
+      allTeamMemberIds = allUsers?.map((user) => user.id);
+    } else {
+      if (Array.isArray(getTeamMembers)) {
+        allTeamMemberIds = getTeamMembers?.map((user) => user.id);
+      }
+      allTeamMemberIds.push(userId);
+    }
+
+    const leads = [];
+
+    for (let memberId of allTeamMemberIds) {
+      const memberLeadsData = await getLeadsStats(memberId);
+
+      leads.push(...memberLeadsData.totalLeadsAssigned);
+    }
+
+    res.status(200).send({ success: true, leads });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 const getDataForDashboard = async (req, res) => {
   try {
     const { endDate, startDate } = req.body;
     let start = moment(startDate).startOf("day").toDate();
     let end = moment(endDate).endOf("day").toDate();
+
+    const memberId = req.body.memberId;
 
     // convert date to timestamp
     let stampStart = Timestamp.fromDate(start);
@@ -574,50 +753,160 @@ const getDataForDashboard = async (req, res) => {
     const getTeamMembers = await getTeamMembersOfUser(userId, allUsers);
     let allTeamMemberIds = [];
 
-    console.log("req.hierarchy is", req.hierarchy);
+    let membersData = [];
+
     // extract the ids of all the team members including user'
     if (req.hierarchy == "superAdmin") {
       allTeamMemberIds = allUsers?.map((user) => user.id);
+      const members = allUsers.filter((user) => user.id !== userId);
+      membersData.push(...members);
     } else {
       if (Array.isArray(getTeamMembers)) {
         allTeamMemberIds = getTeamMembers?.map((user) => user.id);
       }
-      allTeamMemberIds.push(userId);
+      allTeamMemberIds.unshift(userId);
+      const currentUser = allUsers.find((user) => user.id === userId);
+      membersData.push(currentUser, ...getTeamMembers);
     }
 
     // getting the assigned lead to all the team member of user
     let allLeads = [];
-    console.log("allTeamMemberIds", allTeamMemberIds);
-    for (let teamMemberId of allTeamMemberIds) {
-      const snap = await db
-        .collection("leads")
-        .where("updatedAt", ">=", stampStart)
-        .where("updatedAt", "<=", stampEnd)
-        .where("salesExecutive", "==", teamMemberId)
-        .get();
+    // For particular member leads
+    if (memberId) {
+      const currentMember = allUsers.find((user) => user.id === memberId);
+      // if current user is manager than all of his sales team data
+      if (currentMember.hierarchy === "manager") {
+        const managerMembers = await getTeamMembersOfUser(memberId, allUsers);
+        const membersOfManager = managerMembers?.map((user) => user.id);
+        const allMemberIds = [memberId, ...membersOfManager];
+        for (let teamMemberId of allMemberIds) {
+          const snap = await db
+            .collection("leads")
+            .where("updatedAt", ">=", stampStart)
+            .where("updatedAt", "<=", stampEnd)
+            .where("salesExecutive", "==", teamMemberId)
+            .get();
 
-      let snapData = snap.docs.map((doc) => doc.data());
-      // here add the name of the sales executive and assigned by user's
-      snapData = snapData.map((lead) => {
-        if (lead?.salesExecutive) {
-          let salesUser = allUsers.find(
-            (user) => user.id == lead.salesExecutive
-          );
-          lead.salesExecutiveName = salesUser?.name;
-        }
-        if (lead?.assignedBy) {
-          let assignedByUser = allUsers.find(
-            (user) => user.id == lead?.assignedBy
-          );
-          lead.assignedBy = assignedByUser?.name || null;
-        }
-        return lead;
-      });
+          let snapData = snap.docs.map((doc) => doc.data());
+          // here add the name of the sales executive and assigned by user's
+          snapData = snapData.map((lead) => {
+            if (lead?.salesExecutive) {
+              let salesUser = allUsers.find(
+                (user) => user.id == lead.salesExecutive
+              );
+              lead.salesExecutiveName = salesUser?.name;
+            }
+            if (lead?.assignedBy) {
+              let assignedByUser = allUsers.find(
+                (user) => user.id == lead?.assignedBy
+              );
+              lead.assignedBy = assignedByUser?.name || null;
+            }
+            return lead;
+          });
 
-      allLeads = [...allLeads, ...snapData];
+          allLeads = [...allLeads, ...snapData];
+        }
+      } else {
+        const snap = await db
+          .collection("leads")
+          .where("updatedAt", ">=", stampStart)
+          .where("updatedAt", "<=", stampEnd)
+          .where("salesExecutive", "==", memberId)
+          .get();
+
+        let snapData = snap.docs.map((doc) => doc.data());
+        // here add the name of the sales executive and assigned by user's
+        snapData = snapData.map((lead) => {
+          if (lead?.salesExecutive) {
+            let salesUser = allUsers.find(
+              (user) => user.id == lead.salesExecutive
+            );
+            lead.salesExecutiveName = salesUser?.name;
+          }
+          if (lead?.assignedBy) {
+            let assignedByUser = allUsers.find(
+              (user) => user.id == lead?.assignedBy
+            );
+            lead.assignedBy = assignedByUser?.name || null;
+          }
+          return lead;
+        });
+
+        allLeads = [...allLeads, ...snapData];
+      }
+    } else {
+      for (let teamMemberId of allTeamMemberIds) {
+        const snap = await db
+          .collection("leads")
+          .where("updatedAt", ">=", stampStart)
+          .where("updatedAt", "<=", stampEnd)
+          .where("salesExecutive", "==", teamMemberId)
+          .get();
+
+        let snapData = snap.docs.map((doc) => doc.data());
+        // here add the name of the sales executive and assigned by user's
+        snapData = snapData.map((lead) => {
+          if (lead?.salesExecutive) {
+            let salesUser = allUsers.find(
+              (user) => user.id == lead.salesExecutive
+            );
+            lead.salesExecutiveName = salesUser?.name;
+          }
+          if (lead?.assignedBy) {
+            let assignedByUser = allUsers.find(
+              (user) => user.id == lead?.assignedBy
+            );
+            lead.assignedBy = assignedByUser?.name || null;
+          }
+          return lead;
+        });
+
+        allLeads = [...allLeads, ...snapData];
+      }
     }
 
-    res.status(200).send({ success: true, leads: allLeads });
+    membersData = membersData.map((member) => ({
+      name: member.name,
+      id: member.id,
+      hierarchy: member.hierarchy,
+      senior: member.senior,
+    }));
+
+    res.status(200).send({ success: true, leads: allLeads, membersData });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
+const getContractDetails = async (req, res) => {
+  try {
+    const leadId = req.body.leadId;
+    const contractSnap = await db
+      .collection("contracts")
+      .where("leadId", "==", parseInt(leadId))
+      .get();
+    const contractData = contractSnap.docs.map((doc) => ({
+      ...doc.data(),
+      id: doc.id,
+    }));
+
+    const contracts = [];
+    for (let contract of contractData) {
+      const id = contract.id;
+      const snapshot = await db
+        .collection("contracts")
+        .doc(id)
+        .collection("orders")
+        .get();
+      const orders = snapshot.docs.map((doc) => ({
+        ...doc.data(),
+        id: doc.id,
+      }));
+      contracts.push({ ...contract, orders });
+    }
+
+    res.status(200).send({ success: true, contracts });
   } catch (error) {
     res.status(500).send({ success: false, message: error.message });
   }
@@ -626,6 +915,7 @@ const getDataForDashboard = async (req, res) => {
 router.post(
   "/importLeadsFromExcel",
   upload.single("file"),
+  checkAuth,
   importLeadsFromExcel
 );
 router.post("/getLeads", checkAuth, getLeads);
@@ -637,6 +927,9 @@ router.post("/createdManualLead", checkAuth, createdManualLead);
 router.post("/getLeadDetails", checkAuth, getLeadDetails);
 router.post("/manupulateLeads", manupulateLeads);
 router.post("/getLeadsForSalesPanel", checkAuth, getLeadsForSalesPanel);
+router.get("/getUpdatedLeadsCount", checkAuth, getUpdatedLeadsCount);
 router.post("/getDataForDashboard", checkAuth, getDataForDashboard);
+router.post("/getContractDetails", checkAuth, getContractDetails);
+router.get("/getAllAllocatedLeads", checkAuth, getAllAllocatedLeads);
 
 module.exports = { leads: router };

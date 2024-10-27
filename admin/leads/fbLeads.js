@@ -3,8 +3,7 @@ const { Timestamp } = require("@google-cloud/firestore");
 const moment = require("moment"); // Add this line
 const router = express.Router();
 const { db } = require("../../config/firebase");
-const { generateId } = require("../../utils/utils");
-const { FieldValue } = require("firebase-admin/firestore");
+const { generateId, generateSerialNumber } = require("../../utils/utils");
 
 const fetchFacebookData = async (url) => {
   try {
@@ -169,6 +168,7 @@ const storeFBLeads = async (req, res) => {
       allLeads.sort((a, b) => moment(a.created_time) - moment(b.created_time));
       for (let lead of allLeads) {
         const leadId = await generateId("lead");
+        const profileId = generateSerialNumber(`1CD${leadId}`);
         const docId = `1click${leadId}`;
         const leadBody = {
           createdAt: Timestamp.fromDate(moment(lead.created_time).toDate()),
@@ -177,6 +177,7 @@ const storeFBLeads = async (req, res) => {
           disposition: "Not Open",
           subDisposition: "Hot Lead",
           source: "facebook",
+          profileId: profileId,
         };
         await db.collection("leads").doc(docId).set(leadBody);
       }

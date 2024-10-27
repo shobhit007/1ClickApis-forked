@@ -11,7 +11,7 @@ const checkAuth = async (req, res, next) => {
     const decodedToken = token.split(" ")[1];
     const decoded = jwt.verify(decodedToken, process.env.JWT_SECRET);
     const email = decoded.email;
-    const role = decoded.role;
+    const hierarchy = decoded.hierarchy;
     const userSnap = await db
       .collection("users")
       .doc("internal_users")
@@ -27,12 +27,11 @@ const checkAuth = async (req, res, next) => {
         .send({ message: "user not found", success: false });
     }
 
-    if (user.role !== role) {
+    if (user.hierarchy !== hierarchy) {
       return res.status(401).send({ message: "Unauthorized", success: false });
     }
 
     req.email = email;
-    req.role = role;
     req.department = decoded.department;
     req.hierarchy = decoded.hierarchy;
     req.userId = decoded.userId;

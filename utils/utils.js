@@ -1,4 +1,5 @@
 const { db } = require("../config/firebase");
+const moment = require("moment");
 
 const generateId = async (type) => {
   let id = null;
@@ -66,6 +67,17 @@ const generateId = async (type) => {
   return id;
 };
 
+function generateSerialNumber(currentNumber) {
+  // Extract the numeric part from the serial number
+  let numericPart = parseInt(currentNumber.slice(3)); // Extract '0001' from '1CD0001'
+
+  // Convert numeric part back to a string and pad with zeros
+  let numericString = numericPart.toString().padStart(4, "0");
+
+  // Combine the prefix with the numeric part
+  return `1CD${numericString}`;
+}
+
 function getTeamMembersOfUser(userId, users) {
   function findTeamMembers(seniorId) {
     const directMembers = users.filter((user) => user.senior === seniorId);
@@ -78,7 +90,39 @@ function getTeamMembersOfUser(userId, users) {
   return findTeamMembers(userId);
 }
 
+const getLeadsStats = async (salesMemberId) => {
+  const startOfDay = moment().startOf("day").toDate();
+  const endOfDay = moment().endOf("day").toDate();
+
+  // Query leads assigned to the sales member
+  const totalLeadsSnapshot = await db
+    .collection("leads")
+    .where("salesExecutive", "==", salesMemberId)
+    .get();
+
+  const totalLeadsAssigned = totalLeadsSnapshot.docs.map((lead) => lead.data());
+
+  // Query leads updated today
+  const leadsUpdatedTodaySnapshot = await db
+    .collection("leads")
+    .where("salesExecutive", "==", salesMemberId)
+    .where("updatedAt", ">=", startOfDay)
+    .where("updatedAt", "<=", endOfDay)
+    .get();
+
+  const leadsUpdatedToday = leadsUpdatedTodaySnapshot.docs.map((lead) =>
+    lead.data()
+  );
+
+  return {
+    totalLeadsAssigned,
+    leadsUpdatedToday,
+  };
+};
+
 module.exports = {
   generateId,
   getTeamMembersOfUser,
+  getLeadsStats,
+  generateSerialNumber,
 };

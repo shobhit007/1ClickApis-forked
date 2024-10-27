@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const { checkAuth } = require("../../middlewares/authMiddleware");
 const { generateId } = require("../../utils/utils");
 const { sendEmail, generateOTP } = require("../../utils/email");
+const moment = require("moment");
 
 const router = express.Router();
 
@@ -74,11 +75,14 @@ const logIn = async (req, res) => {
     //   jwtPayload.role = user.role;
     // }
 
+    const now = moment();
+    const expiry = moment().endOf("day");
+
     const token = jwt.sign(jwtPayload, process.env.JWT_SECRET, {
-      expiresIn: "1d",
+      expiresIn: expiry.diff(now, "seconds"),
     });
 
-    res.status(200).send({ token, success: true, role: user.role });
+    res.status(200).send({ token, success: true, hierarchy: user.hierarchy });
   } catch (error) {
     console.log(error);
     res.status(500).send({ message: error.message, success: false });
