@@ -543,7 +543,6 @@ const getLeadDetails = async (req, res) => {
 const getLeadsForSalesPanel = async (req, res) => {
   try {
     const body = req.body;
-    console.log("body", body);
     const startDate = body.startDate;
     const endDate = body.endDate;
     const myData = body.myData;
@@ -604,6 +603,7 @@ const getLeadsForSalesPanel = async (req, res) => {
           .get();
 
         const followUpLeads = followUpdateSnap.docs.map((doc) => doc.data());
+
         allLeads.push(...followUpLeads);
       }
 
@@ -626,6 +626,10 @@ const getLeadsForSalesPanel = async (req, res) => {
         return lead;
       });
 
+      const alreadyPresent = allLeads.map((item) => item.leadId);
+      snapData = snapData.filter(
+        (item) => !alreadyPresent.includes(item.leadId)
+      );
       allLeads = [...allLeads, ...snapData];
     }
 
