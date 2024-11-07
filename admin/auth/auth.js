@@ -14,6 +14,9 @@ const createAuth = async (req, res) => {
     const body = req.body;
     let id = await generateId("internal_user");
 
+    body.email = body.email.trim();
+    body.password = body.password.trim();
+
     await db
       .collection("users")
       .doc("internal_users")
