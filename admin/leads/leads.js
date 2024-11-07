@@ -31,14 +31,13 @@ const getLeads = async (req, res) => {
 
     let leadSnap = null;
 
-    console.log("req.hierarchy", req.hierarchy);
     // leads for sales member
-    if (req?.role?.includes("sales")) {
+    if (req?.hierarchy === "executive") {
       leadSnap = await db
         .collection("leads")
         .where("createdAt", ">=", Timestamp.fromDate(startDate))
         .where("createdAt", "<=", Timestamp.fromDate(endDate))
-        .where("salesExecutive", "==", req.email)
+        .where("salesExecutive", "==", req.userId)
         .get();
     } else if (req?.hierarchy == "manager") {
       leadSnap = await db
@@ -98,6 +97,7 @@ const getLeads = async (req, res) => {
 
     res.status(200).json({ leads: modifiedLeads, success: true });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: error.message, success: false });
   }
 };
@@ -137,7 +137,6 @@ const assignLeadsToSalesMember = async (req, res) => {
 };
 
 // get all managers and their team members
-
 const getSalesTeamMembers = async (req, res) => {
   try {
     const salesDeptMembersSnap = await db
@@ -581,6 +580,9 @@ const getLeadsForSalesPanel = async (req, res) => {
           .collection("leads")
           .where("salesExecutive", "==", teamMemberId)
           .get();
+
+        const leadsData = snap.docs.map((doc) => doc.data());
+        allLeads.push(...leadsData);
       } else {
         snap = await db
           .collection("leads")
@@ -588,6 +590,8 @@ const getLeadsForSalesPanel = async (req, res) => {
           .where("assignedAt", "<=", stampEnd)
           .where("salesExecutive", "==", teamMemberId)
           .get();
+
+        const assignedLeads = snap.docs.map((doc) => doc.data());
 
         // Today follow updates
         const followUpdateSnap = await db
@@ -599,13 +603,19 @@ const getLeadsForSalesPanel = async (req, res) => {
 
         const followUpLeads = followUpdateSnap.docs.map((doc) => doc.data());
 
-        allLeads.push(...followUpLeads);
+        allLeads.push(...followUpLeads, ...assignedLeads);
       }
 
-      let snapData = snap.docs.map((doc) => doc.data());
+      // filter leads
+      allLeads = allLeads.reduce((acc, lead) => {
+        if (!acc.find((item) => item.leadId === lead.leadId)) {
+          acc.push(lead);
+        }
+        return acc;
+      }, []);
 
       // here add the name of the sales executive and assigned by user's
-      snapData = snapData.map((lead) => {
+      allLeads = allLeads.map((lead) => {
         if (lead?.salesExecutive) {
           let salesUser = allUsers.find(
             (user) => user.id == lead.salesExecutive
@@ -620,12 +630,6 @@ const getLeadsForSalesPanel = async (req, res) => {
         }
         return lead;
       });
-
-      const alreadyPresent = allLeads.map((item) => item.leadId);
-      snapData = snapData.filter(
-        (item) => !alreadyPresent.includes(item.leadId)
-      );
-      allLeads = [...allLeads, ...snapData];
     }
 
     res.status(200).send({ success: true, leads: allLeads });
