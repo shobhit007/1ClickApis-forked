@@ -56,7 +56,6 @@ const getLeads = async (req, res) => {
         .get();
 
       let teamMembers = teamMemberSnap.docs.map((item) => item.id);
-      console.log(teamMembers, "teamMembers");
 
       leadSnap = await db
         .collection("leads")
@@ -220,7 +219,6 @@ const getUpdateHistoryOfLead = async (req, res) => {
 const globalSearch = async (req, res) => {
   try {
     const { searchBy, searchText } = req.body;
-    console.log("body in global search", req.body);
 
     let leadsSnap;
 
@@ -389,7 +387,7 @@ const importLeadsFromExcel = async (req, res) => {
     const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const data = xlsx.utils.sheet_to_json(sheet);
+    const data = xlsx.utils.sheet_to_json(sheet, { raw: true });
 
     const batch = db.batch();
 
@@ -418,10 +416,11 @@ const importLeadsFromExcel = async (req, res) => {
         }
       }
 
+      let dt = moment(row.Date)?.toDate();
+      let stampValue = Timestamp.fromDate(moment(row.Date).toDate());
+
       const leadBody = {
-        createdAt: Timestamp.fromDate(
-          moment(row.Date, "'DD/MM/YYYY'").toDate()
-        ),
+        createdAt: stampValue,
         createdBy: req.userId,
         leadId: leadCount,
         profileId: generateSerialNumber(`1CD${leadCount}`),
@@ -443,13 +442,9 @@ const importLeadsFromExcel = async (req, res) => {
 
       if (row.salesMember) {
         leadBody.salesExecutive = row.salesMember;
-        leadBody.assignedAt = Timestamp.fromDate(
-          moment(row.Date, "'DD/MM/YYYY'").toDate()
-        );
+        leadBody.assignedAt = Timestamp.fromDate(moment().toDate());
         leadBody.assignedBy = req.userId;
-        leadBody.updatedAt = Timestamp.fromDate(
-          moment(row.Date, "'DD/MM/YYYY'").toDate()
-        );
+        leadBody.updatedAt = Timestamp.fromDate(moment().toDate());
       }
 
       const leadRef = db.collection("leads").doc(leadId);
