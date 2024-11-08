@@ -424,7 +424,7 @@ const importLeadsFromExcel = async (req, res) => {
         leadId: leadCount,
         profileId: generateSerialNumber(`1CD${leadCount}`),
         lookingFor: row["Looking For"] || "NA",
-        companyName: row["Company Name"] || "NA",
+        company_name: row["Company Name"] || "NA",
         full_name: row["Contact Person"] || "NA",
         phone_number: row["Contact Number"] || "NA",
         altPhone: row.altPhone || "NA",
@@ -432,8 +432,8 @@ const importLeadsFromExcel = async (req, res) => {
         city: row.City || "",
         ["whats_is_your_requirement_?_write_in_brief"]: row.Query || "",
         profileScore: row.profileScore || "NA",
-        disposition: row.Disposition || "NA",
-        subDisposition: row["Sub Disposition"] || "NA",
+        disposition: row?.Disposition?.trim() || "NA",
+        subDisposition: row["Sub Disposition"].trim() || "NA",
         remarks: row.remarks || "NA",
         source: "excel_import",
         adType: "manual",
@@ -921,6 +921,7 @@ router.post(
   checkAuth,
   importLeadsFromExcel
 );
+
 router.post("/getLeads", checkAuth, getLeads);
 router.post("/assignLeadsToSalesMember", checkAuth, assignLeadsToSalesMember);
 router.get("/getSalesTeamMembers", checkAuth, getSalesTeamMembers);
