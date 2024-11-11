@@ -415,7 +415,6 @@ const importLeadsFromExcel = async (req, res) => {
         }
       }
 
-      let dt = moment(row.Date)?.toDate();
       let stampValue = Timestamp.fromDate(moment(row.Date).toDate());
 
       const leadBody = {
@@ -433,7 +432,7 @@ const importLeadsFromExcel = async (req, res) => {
         ["whats_is_your_requirement_?_write_in_brief"]: row.Query || "",
         profileScore: row.profileScore || "NA",
         disposition: row?.Disposition?.trim() || "NA",
-        subDisposition: row["Sub Disposition"].trim() || "NA",
+        subDisposition: row["Sub Disposition"]?.trim() || "NA",
         remarks: row.remarks || "NA",
         source: "excel_import",
         adType: "manual",
