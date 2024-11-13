@@ -69,7 +69,7 @@ const generateId = async (type) => {
 
 function generateSerialNumber(currentNumber) {
   // Extract the numeric part from the serial number
-  let numericPart = parseInt(currentNumber.slice(3)); // Extract '0001' from '1CD0001'
+  let numericPart = parseInt(currentNumber); // Extract '0001' from '1CD0001'
 
   // Convert numeric part back to a string and pad with zeros
   let numericString = numericPart.toString().padStart(4, "0");

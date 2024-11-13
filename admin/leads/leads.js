@@ -23,6 +23,7 @@ const createLead = async (data) => {
     .collection("leads")
     .where("phone_number", "==", phone)
     .get();
+
   if (!leadSnap.empty) {
     const leadData = leadSnap.docs[0].data();
     if (data.source === "facebook") {
@@ -34,19 +35,17 @@ const createLead = async (data) => {
         reEnquire: true,
       });
     }
-    return { success: false, message: "Lead already exists" };
+    return { success: false, lead: leadData, message: "Lead already exists" };
   } else {
     const leadId = await generateId("lead");
     const doc = `1click${leadId}`;
-    await db
-      .collection("leads")
-      .doc(doc)
-      .set({
-        ...data,
-        leadId,
-        profileId: generateSerialNumber(leadId),
-      });
-    return { success: true };
+    const leadBody = {
+      ...data,
+      leadId,
+      profileId: generateSerialNumber(leadId),
+    };
+    await db.collection("leads").doc(doc).set(leadBody);
+    return { success: true, lead: leadBody };
   }
 };
 
@@ -283,17 +282,6 @@ const globalSearch = async (req, res) => {
 const createdManualLead = async (req, res) => {
   try {
     const body = req.body;
-    const phone = parseInt(body.phone);
-
-    const snapshot = await db
-      .collection("leads")
-      .where("phone", "==", phone)
-      .get();
-    if (!snapshot.empty) {
-      return res
-        .status(400)
-        .send({ message: "Lead already exists", success: false });
-    }
 
     const leadBody = {
       createdAt: Timestamp.fromDate(moment(body.date).toDate()),
@@ -301,7 +289,7 @@ const createdManualLead = async (req, res) => {
       looking_for: body.lookingFor,
       company_name: body.companyName,
       full_name: body.contactPerson,
-      phone_number: phone,
+      phone_number: body.phone,
       your_mobile_number: body.mobileNumber || "NA",
       email: body.email,
       city: body.city,
@@ -325,6 +313,8 @@ const createdManualLead = async (req, res) => {
         .status(400)
         .send({ message: "Lead already exists", success: false });
     }
+
+    const docId = `1click${result.lead.leadId}`;
 
     await db
       .collection("leads")
