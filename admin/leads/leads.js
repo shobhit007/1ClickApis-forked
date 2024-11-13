@@ -17,6 +17,39 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
+const createLead = async (data) => {
+  const phone = data.phone_number;
+  const leadSnap = await db
+    .collection("leads")
+    .where("phone_number", "==", phone)
+    .get();
+  if (!leadSnap.empty) {
+    const leadData = leadSnap.docs[0].data();
+    if (data.source === "facebook") {
+      const leadId = leadData.leadId;
+      await db.collection("leads").doc(`1click${leadId}`).update({
+        updatedAt: Timestamp.now(),
+        disposition: "Not Open",
+        subDisposition: "Hot Lead",
+        reEnquire: true,
+      });
+    }
+    return { success: false, message: "Lead already exists" };
+  } else {
+    const leadId = await generateId("lead");
+    const doc = `1click${leadId}`;
+    await db
+      .collection("leads")
+      .doc(doc)
+      .set({
+        ...data,
+        leadId,
+        profileId: generateSerialNumber(leadId),
+      });
+    return { success: true };
+  }
+};
+
 // Get all leads
 const getLeads = async (req, res) => {
   try {
@@ -262,20 +295,14 @@ const createdManualLead = async (req, res) => {
         .send({ message: "Lead already exists", success: false });
     }
 
-    const leadId = await generateId("lead");
-    const docId = `1click${leadId}`;
-    const profileId = generateSerialNumber(`1CD${leadId}`);
-
     const leadBody = {
-      profileId,
       createdAt: Timestamp.fromDate(moment(body.date).toDate()),
       createdBy: req.userId,
-      leadId: leadId,
       looking_for: body.lookingFor,
       company_name: body.companyName,
       full_name: body.contactPerson,
       phone_number: phone,
-      altPhoneNumber: body.altPhone,
+      your_mobile_number: body.mobileNumber || "NA",
       email: body.email,
       city: body.city,
       ["whats_is_your_requirement_?_write_in_brief"]: body.requirement,
@@ -292,7 +319,13 @@ const createdManualLead = async (req, res) => {
       updatedAt: Timestamp.now(),
     };
 
-    await db.collection("leads").doc(docId).set(leadBody);
+    const result = await createLead(leadBody);
+    if (!result.success) {
+      return res
+        .status(400)
+        .send({ message: "Lead already exists", success: false });
+    }
+
     await db
       .collection("leads")
       .doc(docId)
@@ -388,12 +421,9 @@ const importLeadsFromExcel = async (req, res) => {
     const sheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(sheet, { raw: true });
 
-    const batch = db.batch();
+    const duplicateLeads = [];
 
     for (let row of data) {
-      const leadCount = await generateId("lead");
-      const leadId = `1click${leadCount}`;
-
       const salesExecutiveEmail = row["User Mail Id"];
       if (salesExecutiveEmail) {
         const salesMemberSnap = await db
@@ -420,13 +450,11 @@ const importLeadsFromExcel = async (req, res) => {
       const leadBody = {
         createdAt: stampValue,
         createdBy: req.userId,
-        leadId: leadCount,
-        profileId: generateSerialNumber(`1CD${leadCount}`),
         lookingFor: row["Looking For"] || "NA",
         company_name: row["Company Name"] || "NA",
         full_name: row["Contact Person"] || "NA",
-        phone_number: row["Contact Number"] || "NA",
-        altPhone: row.altPhone || "NA",
+        phone_number: row["Default Number"] || "NA",
+        your_mobile_number: row["Contact Number"] || "NA",
         email: row["Mail Id"] || "NA",
         city: row.City || "",
         ["whats_is_your_requirement_?_write_in_brief"]: row.Query || "",
@@ -445,15 +473,17 @@ const importLeadsFromExcel = async (req, res) => {
         leadBody.updatedAt = Timestamp.fromDate(moment().toDate());
       }
 
-      const leadRef = db.collection("leads").doc(leadId);
-      batch.set(leadRef, leadBody);
+      const result = await createLead(leadBody);
+      if (!result.success) {
+        duplicateLeads.push(row);
+      }
     }
 
-    await batch.commit();
-
-    res
-      .status(200)
-      .json({ message: "Leads imported successfully", success: true });
+    res.status(200).json({
+      message: "Leads imported successfully",
+      success: true,
+      duplicateLeads,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message, success: false });
@@ -935,4 +965,4 @@ router.post("/getDataForDashboard", checkAuth, getDataForDashboard);
 router.post("/getContractDetails", checkAuth, getContractDetails);
 router.get("/getAllAllocatedLeads", checkAuth, getAllAllocatedLeads);
 
-module.exports = { leads: router };
+module.exports = { leads: router, createLead };
