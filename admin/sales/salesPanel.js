@@ -36,11 +36,19 @@ const updateLead = async (req, res) => {
     const historyRef = db
       .collection("leads")
       .doc(`1click${leadId}`)
-      .collection("history")
-      .doc();
+      .collection("history");
 
-    await leadRef.update({ ...body, updatedAt: Timestamp.now() });
-    await historyRef.set({
+    const historySnap = await historyRef
+      .orderBy("updatedAt", "desc")
+      .limit(1)
+      .get();
+    let dataTag = "NA";
+    if (!historySnap.empty) {
+      dataTag = historySnap.docs[0].data().disposition || "NA";
+    }
+
+    await leadRef.update({ ...body, updatedAt: Timestamp.now(), dataTag });
+    await historyRef.doc().set({
       ...body,
       updatedAt: Timestamp.now(),
       updatedBy: req.userId,
