@@ -1,6 +1,7 @@
 const express = require("express");
 const { db } = require("../../config/firebase");
 const { checkAuth } = require("../../middlewares/authMiddleware");
+const { firestore } = require("firebase-admin");
 const router = express.Router();
 
 const updateColumnsForSalesPanel = async (req, res) => {
@@ -68,15 +69,30 @@ const getLoginPageImageLink = async (req, res) => {
   }
 };
 
+const getAllInternalMembers = async (req, res) => {
+  try {
+    const snap = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .get();
+
+    const data = snap.docs.map((item) => item.data());
+    res.status(200).send({ success: true, data });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post(
   "/updateColumnsForSalesPanel",
   checkAuth,
   updateColumnsForSalesPanel
 );
 
-
 router.get("/getAllColumnsForSalesPanel", getAllColumnsForSalesPanel);
 router.post("/saveImageLinkForLoginPage", checkAuth, saveImageLinkForLoginPage);
 router.get("/getLoginPageImageLink", getLoginPageImageLink);
+router.get("/getAllInternalMembers", checkAuth, getAllInternalMembers);
 
 module.exports = { panel: router };

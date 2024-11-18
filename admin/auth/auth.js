@@ -133,6 +133,12 @@ const updateUser = async (req, res) => {
       .get();
 
     const userId = userSnap.docs[0].id;
+
+    if (body.exitDate && body.exitDate !== "") {
+      let dt = moment(body.exitDate).toDate();
+      body.exitDate = dt;
+    }
+
     await db
       .collection("users")
       .doc("internal_users")
