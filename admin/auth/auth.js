@@ -132,6 +132,11 @@ const updateUser = async (req, res) => {
       .where("email", "==", email)
       .get();
 
+    if (body.updatedEmail && body.updatedEmail != "") {
+      body.email = body.updatedEmail;
+      delete body.updatedEmail;
+    }
+
     const userId = userSnap.docs[0].id;
 
     if (body.exitDate && body.exitDate !== "") {

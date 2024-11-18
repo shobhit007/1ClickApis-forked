@@ -175,13 +175,14 @@ const getSalesTeamMembers = async (req, res) => {
       .collection("users")
       .doc("internal_users")
       .collection("credentials")
-      .where("department", "==", "sales")
       .get();
 
-    const users = salesDeptMembersSnap.docs.map((item) => ({
+    let users = salesDeptMembersSnap.docs.map((item) => ({
       id: item.id,
       ...item.data(),
     }));
+
+    users = users.filter((item) => item.isActive);
 
     const userMap = {};
 
