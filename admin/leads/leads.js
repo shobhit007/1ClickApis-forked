@@ -525,13 +525,18 @@ const getLeadDetails = async (req, res) => {
       .collection("leads")
       .doc(`1click${leadId}`)
       .collection("history")
-      .orderBy("followUpDate", "asc")
+      .orderBy("followUpDate", "desc")
       .get();
 
     const historyData = historySnap.docs.map((item) => ({
       id: item.id,
       ...item.data(),
     }));
+
+    const lastCallBackDate =
+      historyData.length >= 2 ? historyData[1].followUpDate : null;
+
+    leadData.lastCallBackDate = lastCallBackDate;
 
     const productsSnap = await db
       .collection("leads")
