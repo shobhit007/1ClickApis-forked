@@ -436,7 +436,9 @@ const importLeadsFromExcel = async (req, res) => {
         }
       }
 
-      let stampValue = Timestamp.fromDate(moment(row.Date, "DD-MM-YYYY").toDate());
+      let stampValue = Timestamp.fromDate(
+        moment(row.Date, "DD-MM-YYYY").toDate()
+      );
 
       const leadBody = {
         createdAt: stampValue,
@@ -444,7 +446,7 @@ const importLeadsFromExcel = async (req, res) => {
         lookingFor: row["Looking For"] || "NA",
         company_name: row["Company Name"] || "NA",
         full_name: row["Contact Person"] || "NA",
-        phone_number: row["Contact Number"] || "NA",
+        phone_number: row["Default Number"] || "NA",
         your_mobile_number: row["Contact Number"] || "NA",
         email: row["Mail Id"] || "NA",
         city: row.City || "",
@@ -455,7 +457,7 @@ const importLeadsFromExcel = async (req, res) => {
         remarks: row.remarks || "NA",
         source: "excel_import",
         adType: "manual",
-        dataTag: row["Data Tag"] || "NA"
+        dataTag: row["Data Tag"] || "NA",
       };
 
       if (row.salesMember) {
@@ -465,13 +467,11 @@ const importLeadsFromExcel = async (req, res) => {
         leadBody.updatedAt = Timestamp.fromDate(moment().toDate());
       }
 
-
       const result = await createLead(leadBody);
       if (!result.success) {
         duplicateLeads.push(row);
       }
     }
-
 
     res.status(200).json({
       message: "Leads imported successfully",
