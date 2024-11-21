@@ -455,6 +455,7 @@ const importLeadsFromExcel = async (req, res) => {
         remarks: row.remarks || "NA",
         source: "excel_import",
         adType: "manual",
+        dataTag: row["Data Tag"] || "NA"
       };
 
       if (row.salesMember) {
