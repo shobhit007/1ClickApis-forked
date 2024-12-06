@@ -451,7 +451,7 @@ const importLeadsFromExcel = async (req, res) => {
         lookingFor: row["Looking For"] || "NA",
         company_name: row["Company Name"] || "NA",
         full_name: row["Contact Person"] || "NA",
-        phone_number: row["Contact Number"] || "NA",
+        phone_number: row["Default Number"] || "NA",
         your_mobile_number: row["Contact Number"] || "NA",
         email: row["Mail Id"] || "NA",
         city: row.City || "",
@@ -462,6 +462,7 @@ const importLeadsFromExcel = async (req, res) => {
         remarks: row.remarks || "NA",
         source: "excel_import",
         adType: "manual",
+        dataTag: row["Data Tag"] || "NA",
       };
 
       if (row.salesMember) {
