@@ -300,16 +300,18 @@ const createdManualLead = async (req, res) => {
       email: body.email,
       city: body.city,
       ["whats_is_your_requirement_?_write_in_brief"]: body.requirement,
-      profileScore: body.profileScore,
+      profileScore: body.profileScore || "NA",
       salesExecutive: body.salesMember.id,
-      disposition: body.disposition,
-      subDisposition: body.subDisposition,
-      remarks: body.remarks,
+      disposition: body.disposition || "NA",
+      subDisposition: body.subDisposition || "NA",
+      remarks: body.remarks || "NA",
       source: "manual",
       adType: "manual",
       assignedAt: Timestamp.now(),
       assignedBy: req.userId,
-      followUpDate: Timestamp.fromDate(moment(body.followUpDate).toDate()),
+      followUpDate: body.followUpDate
+        ? Timestamp.fromDate(moment(body.followUpDate).toDate())
+        : "NA",
       updatedAt: Timestamp.now(),
     };
 
