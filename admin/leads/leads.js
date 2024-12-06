@@ -264,6 +264,11 @@ const globalSearch = async (req, res) => {
         .collection("leads")
         .where("company_name", "==", searchText)
         .get();
+    } else if (searchBy == "profileId") {
+      leadsSnap = await db
+        .collection("leads")
+        .where("profileId", "==", searchText)
+        .get();
     } else {
       leadsSnap = await db
         .collection("leads")
@@ -436,7 +441,9 @@ const importLeadsFromExcel = async (req, res) => {
         }
       }
 
-      let stampValue = Timestamp.fromDate(moment(row.Date, "DD-MM-YYYY").toDate());
+      let stampValue = Timestamp.fromDate(
+        moment(row.Date, "DD-MM-YYYY").toDate()
+      );
 
       const leadBody = {
         createdAt: stampValue,
@@ -464,13 +471,11 @@ const importLeadsFromExcel = async (req, res) => {
         leadBody.updatedAt = Timestamp.fromDate(moment().toDate());
       }
 
-
       const result = await createLead(leadBody);
       if (!result.success) {
         duplicateLeads.push(row);
       }
     }
-
 
     res.status(200).json({
       message: "Leads imported successfully",
