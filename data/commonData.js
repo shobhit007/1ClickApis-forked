@@ -6,20 +6,31 @@
 //   },
 // ];
 
+/**
+ * Fields assinged to designation
+ * 1. assignedAt = sales executive
+ * 2. allocatedAt = service executive
+ */
+
 const userRoles = [
   {
-    department: "management", hierarchy: ["superAdmin", "Director",
-      'Founder & CEO',
+    department: "management",
+    hierarchy: [
+      "superAdmin",
+      "Director",
+      "Founder & CEO",
       "Co - Founder & COO",
       "Chief Financial Officer",
       "Chief Strategy Officer",
       "Complaince Officer",
       "General Manager",
-      "Assistant General Manager"]
+      "Assistant General Manager",
+    ],
   },
   {
     department: "sales",
-    hierarchy: ["Vice President",
+    hierarchy: [
+      "Vice President",
       "Assistant Vice President",
       "Branch Manager",
       "Manager",
@@ -27,7 +38,8 @@ const userRoles = [
       "Assistant Manager",
       "Sr.Executive",
       "Executive",
-      "Intern"],
+      "Intern",
+    ],
   },
   {
     department: "Clients Service",
@@ -41,8 +53,8 @@ const userRoles = [
       "Customer Success Manager",
       "Sr. Executive",
       "Executive",
-      "Intern"
-    ]
+      "Intern",
+    ],
   },
   {
     department: "Human Resource",
@@ -54,8 +66,8 @@ const userRoles = [
       "HR Manager",
       "Sr.Executive",
       "Executive",
-      "Intern"
-    ]
+      "Intern",
+    ],
   },
   {
     department: "Accounts",
@@ -66,8 +78,8 @@ const userRoles = [
       "Sr. Manager",
       "Manager",
       "Executive",
-      "Intern"
-    ]
+      "Intern",
+    ],
   },
   {
     department: "Technology",
@@ -86,8 +98,8 @@ const userRoles = [
       "Social Media Marketing Executive",
       "Manager Graphic Design",
       "Graphic Design Executive",
-      "Intern"
-    ]
+      "Intern",
+    ],
   },
   {
     department: "Administration",
@@ -97,9 +109,9 @@ const userRoles = [
       "Manager",
       "Executive",
       "Housekeeping Manager",
-      "House Keeping Executive"
-    ]
-  }
+      "House Keeping Executive",
+    ],
+  },
 ];
 
 module.exports = { userRoles };
