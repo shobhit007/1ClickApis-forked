@@ -58,12 +58,13 @@ const assignPanelToRole = async (req, res) => {
   try {
     const role = req.body.role;
     const panels = req.body.panels;
+    const department = req.body.department;
 
     await db
       .collection("users")
       .doc("rolesAndPermissions")
       .collection("roles")
-      .doc(role)
+      .doc(`${role}_${department}`)
       .set(
         {
           permissions: panels,
@@ -78,35 +79,36 @@ const assignPanelToRole = async (req, res) => {
     res.status(500).send({ message: error.message, success: false });
   }
 };
-const getAllRoles = async (req, res) => {
-  try {
-    const snapshot = await db
-      .collection("users")
-      .doc("rolesAndPermissions")
-      .collection("roles")
-      .get();
-    const roles = snapshot.docs.map((doc) => doc.id);
-    res.status(200).send({ roles, success: true });
-  } catch (error) {
-    res.status(500).send({ message: error.message, success: false });
-  }
-};
 
-const getRolePanels = async (req, res) => {
-  try {
-    const role = req.role;
-    const roleSnap = await db
-      .collection("users")
-      .doc("rolesAndPermissions")
-      .collection("roles")
-      .doc(role)
-      .get();
-    const permissions = roleSnap.data().permissions;
-    res.status(200).send({ id: role, panels: permissions, success: true });
-  } catch (error) {
-    res.status(500).send({ message: error.message, success: false });
-  }
-};
+// const getAllRoles = async (req, res) => {
+//   try {
+//     const snapshot = await db
+//       .collection("users")
+//       .doc("rolesAndPermissions")
+//       .collection("roles")
+//       .get();
+//     const roles = snapshot.docs.map((doc) => doc.id);
+//     res.status(200).send({ roles, success: true });
+//   } catch (error) {
+//     res.status(500).send({ message: error.message, success: false });
+//   }
+// };
+
+// const getRolePanels = async (req, res) => {
+//   try {
+//     const role = req.role;
+//     const roleSnap = await db
+//       .collection("users")
+//       .doc("rolesAndPermissions")
+//       .collection("roles")
+//       .doc(role)
+//       .get();
+//     const permissions = roleSnap.data().permissions;
+//     res.status(200).send({ id: role, panels: permissions, success: true });
+//   } catch (error) {
+//     res.status(500).send({ message: error.message, success: false });
+//   }
+// };
 
 const getRoles = async (req, res) => {
   try {
@@ -115,10 +117,12 @@ const getRoles = async (req, res) => {
       .doc("rolesAndPermissions")
       .collection("roles")
       .get();
-    const roles = snapshot.docs.map((doc) => ({
-      panels: doc.data().permissions,
-      id: doc.id,
-    }));
+
+    const roles = snapshot.docs.map((doc) => {
+      let hierarchy = doc.id.split("_")[0];
+      let department = doc.id.split("_")[1];
+      return { panels: doc.data().permissions, id: hierarchy, department };
+    });
 
     res.status(200).send({ roles });
   } catch (error) {
@@ -129,7 +133,7 @@ const getRoles = async (req, res) => {
 router.post("/assignRole", checkAuth, assignRole);
 router.post("/createRole", checkAuth, createRole);
 router.post("/assignPanelToRole", checkAuth, assignPanelToRole);
-router.get("/getAllRoles", getAllRoles);
-router.get("/getRolePanels", checkAuth, getRolePanels);
+// router.get("/getAllRoles", getAllRoles);
+// router.get("/getRolePanels", checkAuth, getRolePanels);
 router.get("/getRoles", getRoles);
 module.exports = { roles: router };

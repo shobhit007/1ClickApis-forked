@@ -122,6 +122,64 @@ const getServiceLeads = async (req, res) => {
   }
 };
 
+const getServiceMembers = async (req, res) => {
+  try {
+    const salesDeptMembersSnap = await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .where("department", "==", "Clients Service")
+      .get();
+
+    let users = salesDeptMembersSnap.docs.map((item) => ({
+      id: item.id,
+      ...item.data(),
+    }));
+
+    users = users.filter((item) => item.isActive);
+
+    const userMap = {};
+
+    users.forEach((user) => {
+      userMap[user.id] = { ...user, teamMembers: [] };
+    });
+
+    let result = [];
+    const orphans = [];
+    users.forEach((user) => {
+      if (user.senior) {
+        if (userMap[user.senior]) {
+          userMap[user.senior].teamMembers.push(userMap[user.id]);
+        }
+      } else {
+        result.push(userMap[user.id]);
+      }
+    });
+
+    users.forEach((user) => {
+      if (
+        (!user?.senior || user?.seniour == "") &&
+        userMap[user.id].teamMembers.length === 0
+      ) {
+        orphans.push(userMap[user.id]);
+      }
+    });
+
+    result = result.filter((item) => {
+      let found = orphans.find((i) => i.id == item.id);
+
+      return !found;
+    });
+
+    let finalData = [...result, ...orphans];
+
+    res.status(200).send({ success: true, data: finalData });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post("/getServiceLeads", checkAuth, getServiceLeads);
+router.get("/getServiceMembers", checkAuth, getServiceMembers);
 
 module.exports = { serviceLeads: router };
