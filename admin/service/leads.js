@@ -171,7 +171,10 @@ const getLeadsForService = async (req, res) => {
     let leads;
 
     if (value === "welcome_calls") {
-      if (userRole === "superAdmin") {
+      if (
+        userRole === "superAdmin" ||
+        (userDepartment === "Clients Service" && userRole === "Vice President")
+      ) {
         const snapshot = await db
           .collection("leads")
           .where("welcomeCall", "==", false)
@@ -199,8 +202,10 @@ const getLeadsForService = async (req, res) => {
         }
       }
     } else if (value === "my_allocations") {
-      console.log("here");
-      if (userRole === "superAdmin") {
+      if (
+        userRole === "superAdmin" ||
+        (userDepartment === "Clients Service" && userRole === "Vice President")
+      ) {
         const snapshot = await db
           .collection("leads")
           .where("disposition", "==", "Deal Done")
