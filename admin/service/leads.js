@@ -270,8 +270,9 @@ const getLeadsForService = async (req, res) => {
         lead.serviceExecutiveName = allUsersByIds[lead.serviceExecutive]?.name;
       }
 
-      if (lead?.assignedBy) {
-        lead.assignedBy = allTeamMemberIds[lead.assignedBy]?.name || null;
+      if (lead?.assignedServiceLeadBy) {
+        lead.assignedServiceLeadBy =
+          allUsersByIds[lead.assignedServiceLeadBy]?.name || null;
       }
       return lead;
     });
@@ -383,11 +384,12 @@ const allocateServiceLeads = async (req, res) => {
     const batch = db.batch();
 
     for (let lead of leads) {
-      const leadRef = db.collection("leads").doc(lead.leadId);
+      const leadRef = db.collection("leads").doc(`1click${lead}`);
       batch.update(leadRef, {
         serviceExecutive: serviceExecutive,
-        allocatedServiceAt: Timestamp.now(),
-        assignedServiceBy: req.userId,
+        allocatedServiceLeadAt: Timestamp.now(),
+        assignedServiceLeadBy: req.userId,
+        welcomeCall: false,
       });
     }
 
