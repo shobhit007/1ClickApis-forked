@@ -142,11 +142,10 @@ const getServiceLeads = async (req, res) => {
 const getLeadsForService = async (req, res) => {
   try {
     const body = req.body;
+    console.log("body", body);
     const value = body.value;
-    const startDate = moment(body.startDate, "YYYY-MM-DD")
-      .startOf("day")
-      .toDate();
-    const endDate = moment(body.endDate, "YYYY-MM-DD").endOf("day").toDate();
+    const startDate = moment(body.startDate).startOf("day").toDate();
+    const endDate = moment(body.endDate).endOf("day").toDate();
 
     const userDepartment = req.department;
     const userRole = req.hierarchy;
@@ -200,6 +199,7 @@ const getLeadsForService = async (req, res) => {
         }
       }
     } else if (value === "my_allocations") {
+      console.log("here");
       if (userRole === "superAdmin") {
         const snapshot = await db
           .collection("leads")
@@ -210,6 +210,7 @@ const getLeadsForService = async (req, res) => {
         leads = snapshot.docs.map((doc) => doc.data());
         allLeads.push(...leads);
       } else {
+        console.log("here2");
         if (Array.isArray(getTeamMembers)) {
           allTeamMemberIds = getTeamMembers?.map((user) => user.id);
         }
@@ -225,6 +226,7 @@ const getLeadsForService = async (req, res) => {
           leads = snapshot.docs.map((doc) => doc.data());
           allLeads.push(...leads);
         }
+        console.log("allLeads", allLeads.length);
       }
     } else if (value === "distributor_onboarding") {
       const snapshot = await db
@@ -271,6 +273,7 @@ const getLeadsForService = async (req, res) => {
 
     res.status(200).json({ success: true, leads: allLeads });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: error.message, success: false });
   }
 };
@@ -368,10 +371,36 @@ const getServiceMembers = async (req, res) => {
   }
 };
 
+const allocateServiceLeads = async (req, res) => {
+  try {
+    const leads = req.body.leads;
+    const serviceExecutive = req.body.serviceExecutive;
+    const batch = db.batch();
+
+    for (let lead of leads) {
+      const leadRef = db.collection("leads").doc(lead.leadId);
+      batch.update(leadRef, {
+        serviceExecutive: serviceExecutive,
+        allocatedServiceAt: Timestamp.now(),
+        assignedServiceBy: req.userId,
+      });
+    }
+
+    await batch.commit();
+
+    res
+      .status(200)
+      .send({ success: true, message: "Leads allocated successfully" });
+  } catch (error) {
+    res.status(500).send({ message: error.message, success: false });
+  }
+};
+
 router.post("/getServiceLeads", checkAuth, getServiceLeads);
 router.post("/getWelcomeCalls", checkAuth, getWelcomeCalls);
 router.post("/getMyServiceData", checkAuth, getMyServiceData);
 router.post("/getLeadsForService", checkAuth, getLeadsForService);
 router.get("/getServiceMembers", checkAuth, getServiceMembers);
+router.post("/allocateServiceLeads", checkAuth, allocateServiceLeads);
 
 module.exports = { serviceLeads: router };
