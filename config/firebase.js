@@ -4,8 +4,10 @@ const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT);
 firebase.initializeApp({
   credential: firebase.credential.cert(serviceAccount),
   databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`,
+  storageBucket: `${serviceAccount.project_id}.appspot.com`,
 });
 
 const db = firebase.firestore();
+const storage = firebase.storage();
 
-module.exports = { db };
+module.exports = { db, storage };

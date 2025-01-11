@@ -1,11 +1,14 @@
 const express = require("express");
-const { db } = require("../../config/firebase");
+const { db, storage } = require("../../config/firebase");
 const { checkAuth } = require("../../middlewares/authMiddleware");
 const moment = require("moment");
 const { Timestamp, FieldValue } = require("firebase-admin/firestore");
 const { getTeamMembersOfUser } = require("../../utils/utils");
+const multer = require("multer");
 
 const router = express.Router();
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const getServiceLeads = async (req, res) => {
   try {
@@ -177,6 +180,7 @@ const getLeadsForService = async (req, res) => {
       ) {
         const snapshot = await db
           .collection("leads")
+          .where("disposition", "==", "Deal Done")
           .where("welcomeCall", "==", false)
           .orderBy("updatedAt", "desc")
           .get();
@@ -193,6 +197,7 @@ const getLeadsForService = async (req, res) => {
           const snapshot = await db
             .collection("leads")
             .where("serviceExecutive", "==", teamMemberId)
+            .where("disposition", "==", "Deal Done")
             .where("welcomeCall", "==", false)
             .orderBy("updatedAt", "desc")
             .get();
@@ -209,6 +214,7 @@ const getLeadsForService = async (req, res) => {
         const snapshot = await db
           .collection("leads")
           .where("disposition", "==", "Deal Done")
+          .where("welcomeCall", "==", true)
           .orderBy("updatedAt", "desc")
           .get();
 
@@ -225,6 +231,8 @@ const getLeadsForService = async (req, res) => {
           const snapshot = await db
             .collection("leads")
             .where("serviceExecutive", "==", teamMemberId)
+            .where("disposition", "==", "Deal Done")
+            .where("welcomeCall", "==", true)
             .orderBy("updatedAt", "desc")
             .get();
 
@@ -276,6 +284,8 @@ const getLeadsForService = async (req, res) => {
       }
       return lead;
     });
+
+    console.log("allLeads", allLeads.length);
 
     res.status(200).json({ success: true, leads: allLeads });
   } catch (error) {
@@ -403,11 +413,135 @@ const allocateServiceLeads = async (req, res) => {
   }
 };
 
+const updateWelcomeCall = async (req, res) => {
+  try {
+    console.log("body", req.body);
+    const formatedData = req.body.data;
+
+    const {
+      bankDetails,
+      taxDetails,
+      productdDetails,
+      businessDetails,
+      personalDetails,
+      leadId,
+    } = formatedData;
+
+    const completeFormData = {
+      personalDetails,
+      businessDetails,
+      taxDetails,
+      bankDetails,
+      productdDetails,
+    };
+
+    const leadRef = db.collection("leads").doc(`1click${leadId}`);
+    const snapshot = await leadRef
+      .collection("welcomeCall")
+      .doc("welcomeCall")
+      .get();
+    if (snapshot.exists) {
+      console.log("Document exists");
+      completeFormData.updatedAt = Timestamp.now();
+      await leadRef
+        .collection("welcomeCall")
+        .doc("welcomeCall")
+        .update(completeFormData);
+    } else {
+      console.log("Document does not exist");
+      completeFormData.createdAt = Timestamp.now();
+      await leadRef
+        .collection("welcomeCall")
+        .doc("welcomeCall")
+        .set(completeFormData);
+    }
+
+    res.status(200).json({ message: "Form submitted successfully!" });
+  } catch (error) {
+    console.error("Error submitting form:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const uploadServiceProduct = async (req, res) => {
+  try {
+    const leadId = req.body.leadId;
+    const product = req.body.product;
+    const leadRef = db.collection("leads").doc(`1click${leadId}`);
+
+    await leadRef
+      .collection("welcomeCall")
+      .doc("welcomeCall")
+      .collection("products")
+      .add(product);
+
+    res.status(200).json({ message: "Product added successfully!" });
+  } catch (error) {
+    console.error("Error submitting form:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const deleteServiceProduct = async (req, res) => {
+  try {
+    const leadId = req.body.leadId;
+    const productId = req.body.productId;
+    const leadRef = db.collection("leads").doc(`1click${leadId}`);
+
+    console.log(req.body);
+
+    await leadRef
+      .collection("welcomeCall")
+      .doc("welcomeCall")
+      .collection("products")
+      .doc(productId)
+      .delete();
+
+    res.status(200).json({ message: "Product deleted successfully!" });
+  } catch (error) {
+    console.error("Error submitting form:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const getWelcomeCallData = async (req, res) => {
+  try {
+    const leadId = req.body.leadId;
+    const leadRef = db.collection("leads").doc(`1click${leadId}`);
+    const snapshot = await leadRef
+      .collection("welcomeCall")
+      .doc("welcomeCall")
+      .get();
+
+    if (snapshot.exists) {
+      const data = snapshot.data();
+      const products = await leadRef
+        .collection("welcomeCall")
+        .doc("welcomeCall")
+        .collection("products")
+        .get();
+      data.products = products.docs.map((doc) => ({
+        ...doc.data(),
+        id: doc.id,
+      }));
+      res.status(200).json({ success: true, data });
+    } else {
+      res.status(200).json({ success: false, message: "No data found" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message, success: false });
+  }
+};
+
+router.post("/getWelcomeCallData", checkAuth, getWelcomeCallData);
+router.post("/updateWelcomeCall", updateWelcomeCall);
 router.post("/getServiceLeads", checkAuth, getServiceLeads);
 router.post("/getWelcomeCalls", checkAuth, getWelcomeCalls);
 router.post("/getMyServiceData", checkAuth, getMyServiceData);
 router.post("/getLeadsForService", checkAuth, getLeadsForService);
 router.get("/getServiceMembers", checkAuth, getServiceMembers);
 router.post("/allocateServiceLeads", checkAuth, allocateServiceLeads);
+router.post("/uploadServiceProduct", checkAuth, uploadServiceProduct);
+router.post("/deleteServiceProduct", checkAuth, deleteServiceProduct);
 
 module.exports = { serviceLeads: router };
