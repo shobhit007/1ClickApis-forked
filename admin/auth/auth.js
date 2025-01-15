@@ -66,12 +66,14 @@ const logIn = async (req, res) => {
         .send({ success: false, message: "You are not authorized" });
     }
 
+    let userType = user.userType || "internal_user";
     const jwtPayload = {
       email: user.email,
       name: user.name,
       department: user.department,
       hierarchy: user.hierarchy,
       userId: userSnap.docs[0].id,
+      userType,
     };
 
     // if (user.role) {
@@ -85,7 +87,9 @@ const logIn = async (req, res) => {
       expiresIn: expiry.diff(now, "seconds"),
     });
 
-    res.status(200).send({ token, success: true, hierarchy: user.hierarchy });
+    res
+      .status(200)
+      .send({ token, success: true, hierarchy: user.hierarchy, userType });
   } catch (error) {
     console.log(error);
     res.status(500).send({ message: error.message, success: false });

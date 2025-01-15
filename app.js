@@ -35,6 +35,10 @@ app.use("/admin/panel", panel);
 const { serviceLeads } = require("./admin/service/leads");
 app.use("/admin/service", serviceLeads);
 
+// service panel
+const { manufacturer } = require("./admin/service/manufacturer");
+app.use("/service/manufacturer", manufacturer);
+
 const PORT = parseInt(process.env.PORT) || 8080;
 
 app.listen(PORT, () => {
