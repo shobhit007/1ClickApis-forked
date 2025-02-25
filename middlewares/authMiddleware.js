@@ -35,6 +35,7 @@ const checkAuth = async (req, res, next) => {
     req.department = decoded.department;
     req.hierarchy = decoded.hierarchy;
     req.userId = decoded.userId;
+    req.userLeadId = decoded.userLeadId || null;
     req.decoded = decoded;
     next();
   } catch (error) {
