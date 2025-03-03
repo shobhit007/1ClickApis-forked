@@ -1,3 +1,5 @@
+const { v4 } = require("uuid");
+
 const getSubordinateMembers = async (memberId) => {
   try {
   } catch (error) {
@@ -5,4 +7,6 @@ const getSubordinateMembers = async (memberId) => {
   }
 };
 
-module.exports = { getSubordinateMembers };
+const getUniqueId = () => Promise.resolve(v4());
+
+module.exports = { getSubordinateMembers, getUniqueId };
