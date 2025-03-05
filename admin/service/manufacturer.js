@@ -148,6 +148,29 @@ const getAllUpdatesOfLead = async (req, res) => {
   }
 };
 
+const updateArchiveStatusOfLead = async (req, res) => {
+  try {
+    const { serviceDocId, archived } = req.body;
+
+    if (!serviceDocId) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Invalid request" });
+    }
+
+    const updatesSnap = await db
+      .collection("service")
+      .doc(serviceDocId)
+      .update({
+        archived: archived || false,
+      });
+
+    res.status(200).send({ success: true, message: "Udpated" });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 const addProduct = async (req, res) => {
   try {
     console.log("adding product", req.body);
@@ -235,6 +258,7 @@ const getAllProductsOfUser = async (req, res) => {
 
 router.post("/getAllocatedLeads", checkAuth, getAllocatedLeads);
 router.post("/getAllUpdatesOfLead", checkAuth, getAllUpdatesOfLead);
+router.post("/updateArchiveStatusOfLead", checkAuth, updateArchiveStatusOfLead);
 router.post("/updateAllocatedLead", checkAuth, updateAllocatedLead);
 router.post("/addProduct", checkAuth, addProduct);
 router.post("/updateProduct", checkAuth, updateProduct);
