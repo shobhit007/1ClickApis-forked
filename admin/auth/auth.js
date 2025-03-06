@@ -292,7 +292,37 @@ const getUserDetails = async (req, res) => {
         .doc(`1click${userData.userLeadId}`)
         .get();
 
-      additionalData = snap.data();
+      if (snap.exists) {
+        let snapdata = snap.data();
+        if (snapdata?.serviceExecutive) {
+          let serviceExecutiveSnap = await db
+            .collection("users")
+            .doc("internal_users")
+            .collection("credentials")
+            .doc(snapdata.serviceExecutive)
+            .get();
+
+          console.log(
+            "serviceExecutiveSnap.exists",
+            serviceExecutiveSnap.exists
+          );
+          if (!serviceExecutiveSnap.exists) {
+            additionalData = snapdata;
+          } else {
+            console.log("i am here");
+            let serviceExecutive = serviceExecutiveSnap.data();
+            console.log("serviceExecutive", serviceExecutive);
+            additionalData = {
+              ...snapdata,
+              serviceExecutiveName: serviceExecutive.name,
+              serviceExecutiveImage: serviceExecutive.userImageLink,
+              serviceExecutivePhone: serviceExecutive.phone,
+            };
+          }
+        }
+      } else {
+        additionalData = snap.data();
+      }
     }
     return res
       .status(200)
@@ -306,7 +336,7 @@ const updateUserProfile = async (req, res) => {
   try {
     const body = req.body;
     const userLeadId = req.userLeadId;
-    console.log('userlead data ', userLeadId);
+    console.log("userlead data ", userLeadId);
     if (!userLeadId) {
       return res.status(401).send({ message: "Invalid user", success: false });
     }
