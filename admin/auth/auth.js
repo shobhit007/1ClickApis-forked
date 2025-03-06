@@ -6,6 +6,7 @@ const { checkAuth } = require("../../middlewares/authMiddleware");
 const { generateId } = require("../../utils/utils");
 const { sendEmail, generateOTP } = require("../../utils/email");
 const moment = require("moment");
+const { firestore } = require("firebase-admin");
 
 const router = express.Router();
 
@@ -76,12 +77,16 @@ const logIn = async (req, res) => {
       userType,
     };
 
+    if (userType != "internal_user") {
+      jwtPayload.userLeadId = user.userLeadId;
+    }
+
     // if (user.role) {
     //   jwtPayload.role = user.role;
     // }
 
     const now = moment();
-    const expiry = moment().endOf("day");
+    const expiry = moment().add({ days: 15 }).endOf("day");
 
     const token = jwt.sign(jwtPayload, process.env.JWT_SECRET, {
       expiresIn: expiry.diff(now, "seconds"),
@@ -265,7 +270,6 @@ const resetPassword = async (req, res) => {
 const getUserDetails = async (req, res) => {
   try {
     const email = req.email;
-
     const userSnap = await db
       .collection("users")
       .doc("internal_users")
@@ -280,7 +284,34 @@ const getUserDetails = async (req, res) => {
     }
 
     let userData = userSnap.docs[0].data();
-    return res.status(200).send({ success: true, data: userData });
+
+    let additionalData = {};
+    if (userData?.userType == "manufacturer") {
+      let snap = await db
+        .collection("leads")
+        .doc(`1click${userData.userLeadId}`)
+        .get();
+
+      additionalData = snap.data();
+    }
+    return res
+      .status(200)
+      .send({ success: true, data: { ...userData, ...additionalData } });
+  } catch (error) {
+    res.status(500).send({ message: error.message, success: false });
+  }
+};
+
+const updateUserProfile = async (req, res) => {
+  try {
+    const body = req.body;
+    const userLeadId = req.userLeadId;
+    console.log('userlead data ', userLeadId);
+    if (!userLeadId) {
+      return res.status(401).send({ message: "Invalid user", success: false });
+    }
+    await db.collection("leads").doc(`1click${userLeadId}`).update(body);
+    res.status(200).send({ success: true, message: "Updated successfully" });
   } catch (error) {
     res.status(500).send({ message: error.message, success: false });
   }
@@ -295,6 +326,29 @@ const validateToken = async (req, res) => {
   }
 };
 
+const getUserProfile = async (req, res) => {
+  try {
+    const { leadId } = req.body;
+
+    if (!leadId)
+      return res
+        .status(401)
+        .send({ success: false, message: "invalid lead id" });
+
+    const snap = await db.collection("leads").doc(`1click${leadId}`).get();
+    if (!snap.exists) {
+      return res
+        .status(404)
+        .send({ success: false, message: "User not found" });
+    }
+
+    let user = snap.data();
+    res.status(200).send({ success: true, userData: user });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post("/login", logIn);
 router.post("/createAuth", checkAuth, createAuth);
 router.post("/updateUser", checkAuth, updateUser);
@@ -304,5 +358,7 @@ router.post("/verifyOtp", verifyOtp);
 router.post("/resetPassword", resetPassword);
 router.get("/getUserDetails", checkAuth, getUserDetails);
 router.get("/validateToken", checkAuth, validateToken);
+router.post("/getUserProfile", checkAuth, getUserProfile);
+router.post("/updateUserProfile", checkAuth, updateUserProfile);
 
 module.exports = { auth: router };

@@ -980,6 +980,37 @@ const getContractDetails = async (req, res) => {
   }
 };
 
+const updateLeadType = async (req, res) => {
+  try {
+    const leadsSnap = await db.collection("leads").get();
+    const leads = leadsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+    let batch = db.batch();
+    let ref = db.collection("leads");
+
+    leads.forEach((lead) => {
+      let leadType = null;
+      if (lead.lookingFor) {
+        leadType = "manufacturer";
+      } else if (lead["are_you_in_business_?"]) {
+        leadType = "distributor";
+      }
+
+      if (leadType) {
+        let docRef = ref.doc(lead.id);
+        batch.update(docRef, { leadType });
+      }
+    });
+
+    await batch.commit();
+    res
+      .status(200)
+      .send({ success: true, message: "Leads updated successfully" });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post(
   "/importLeadsFromExcel",
   upload.single("file"),
@@ -987,6 +1018,7 @@ router.post(
   importLeadsFromExcel
 );
 
+router.post("/updateLeadType", updateLeadType);
 router.post("/getLeads", checkAuth, getLeads);
 router.post("/assignLeadsToSalesMember", checkAuth, assignLeadsToSalesMember);
 router.get("/getSalesTeamMembers", checkAuth, getSalesTeamMembers);
