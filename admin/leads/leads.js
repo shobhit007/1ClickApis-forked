@@ -4,6 +4,7 @@ const { checkAuth } = require("../../middlewares/authMiddleware");
 const moment = require("moment");
 const { Timestamp, FieldValue } = require("firebase-admin/firestore");
 const { userRoles } = require("../../data/commonData");
+const ExcelJS = require("exceljs");
 const {
   generateId,
   getTeamMembersOfUser,
@@ -258,9 +259,11 @@ const globalSearch = async (req, res) => {
     let leadsSnap;
 
     if (searchBy == "leadId") {
+      let splits = searchText.split("1CD");
+      let leadId = splits[splits.length - 1];
       leadsSnap = await db
         .collection("leads")
-        .where("leadId", "==", parseInt(searchText))
+        .where("leadId", "==", parseInt(leadId))
         .get();
     } else if (searchBy == "companyName") {
       leadsSnap = await db
@@ -697,6 +700,30 @@ const getLeadsForSalesPanel = async (req, res) => {
       });
     }
 
+    if (myData) {
+      const order = [
+        "NA",
+        "Not Open",
+        "Call Back",
+        "No Response",
+        "Presentation",
+        "FollowUp",
+        "Prospect",
+        "Not Interested",
+        "Deal Done",
+      ];
+
+      allLeads.sort((a, b) => {
+        const indexA = order.indexOf(a.disposition);
+        const indexB = order.indexOf(b.disposition);
+        // If disposition is not in the predefined order, send it to the bottom
+        return (
+          (indexA === -1 ? Infinity : indexA) -
+          (indexB === -1 ? Infinity : indexB)
+        );
+      });
+    }
+
     res.status(200).send({ success: true, leads: allLeads });
   } catch (error) {
     res.status(500).send({ success: false, message: error.message });
@@ -1011,6 +1038,127 @@ const updateLeadType = async (req, res) => {
   }
 };
 
+// Get Hot leads for downloads in excel sheet
+const getHotLeads = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.body;
+
+    // Create start and end dates for the query
+    let start = moment(startDate).startOf("day").toDate();
+    let end = moment(endDate).endOf("day").toDate();
+
+    // Convert dates to Firestore Timestamps (if needed)
+    let stampStart = Timestamp.fromDate(start);
+    let stampEnd = Timestamp.fromDate(end);
+
+    // Query Firestore
+    const allLeads = await db
+      .collection("leads")
+      .where("createdAt", ">=", stampStart)
+      .where("createdAt", "<=", stampEnd)
+      .where("source", "==", "facebook")
+      .get();
+
+    // Extract the data from each document
+    let leads = allLeads.docs.map((doc) => doc.data());
+    leads = leads.map((lead) => {
+      const createdAt = moment(lead.createdAt.toDate()).format("DD/MM/YYYY");
+
+      delete lead.created_time;
+      delete lead.leadId;
+      delete lead.salesExecutive;
+      delete lead.salesExecutiveName;
+      delete lead.assignedBy;
+      delete lead.dataTag;
+      delete lead.updatedAt;
+      delete lead.assignedAt;
+      delete lead.followUpDate;
+      delete lead.your_mobile_number;
+
+      return { ...lead, createdAt };
+    });
+
+    // Create a new Excel workbook and add a worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Hot Leads");
+
+    // If you know the structure of your data, you can define columns explicitly.
+    // Otherwise, if you want to dynamically use the keys from the first lead:
+    if (leads.length > 0) {
+      const columns = Object.keys(leads[0]).map((key) => ({
+        header: key, // Column header in the Excel file
+        key: key, // Key in your data object
+        width: 20, // Optional: set a width for the column
+      }));
+      worksheet.columns = columns;
+    } else {
+      // If no leads, you can set default columns or simply leave it empty.
+      worksheet.columns = [];
+    }
+
+    // Add each lead as a row in the worksheet
+    leads.forEach((lead) => {
+      worksheet.addRow(lead);
+    });
+
+    // Set the appropriate headers so the browser will download the file
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", "attachment; filename=hot_leads.xlsx");
+
+    // Write the Excel file directly to the response.
+    // The write() method returns a Promise so you can await it.
+    await workbook.xlsx.write(res);
+
+    // End the response
+    res.end();
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
+const changeToDate = (date) => {
+  if (!date._seconds) return null;
+  let dt = new Timestamp(date._seconds, date._nanoseconds).toDate();
+  return moment(dt).format("DD-MM-YYYY hh:mm A");
+};
+
+const deleteDataFromDb = async (req, res) => {
+  try {
+    console.log("req.decoded", req.decoded, req.hierarchy);
+
+    if (req.hierarchy != "superAdmin") {
+      return res
+        .status(401)
+        .send({ success: false, message: "Not authorized" });
+    }
+
+    const { leads } = req.body;
+
+    console.log("leads", leads, req.body);
+
+    if (!leads?.length) {
+      return res
+        .status(400)
+        .send({ success: false, message: "No data provided" });
+    }
+
+    const batch = db.batch();
+
+    leads.forEach((id) => {
+      let ref = db.collection("leads").doc(id);
+      batch.delete(ref);
+    });
+    batch.commit();
+
+    res.status(200).send({ success: true, message: "Deleted successfully" });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post(
   "/importLeadsFromExcel",
   upload.single("file"),
@@ -1032,5 +1180,7 @@ router.get("/getUpdatedLeadsCount", checkAuth, getUpdatedLeadsCount);
 router.post("/getDataForDashboard", checkAuth, getDataForDashboard);
 router.post("/getContractDetails", checkAuth, getContractDetails);
 router.get("/getAllAllocatedLeads", checkAuth, getAllAllocatedLeads);
+router.post("/getHotLeads", getHotLeads);
+router.post("/deleteDataFromDb", checkAuth, deleteDataFromDb);
 
 module.exports = { leads: router, createLead };

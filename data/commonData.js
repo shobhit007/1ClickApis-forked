@@ -114,4 +114,48 @@ const userRoles = [
   },
 ];
 
+const dispositions = [
+  "Not Open",
+  "No Response",
+  "Call Back",
+  "Presentation",
+  "FollowUp",
+  "Prospect",
+  "Payment",
+  "Not Interested",
+  "Presentation NI",
+  "Prospect NI",
+  "No Contactable",
+  "Become Distributor",
+  "Deal Done",
+];
+
+const subDispositions = {
+  "Not Open": ["Hot Lead"],
+  "No Response": ["Ringing", "S.Off", "Not Reachable", "Hung Up"],
+  "Call Back": ["Call Back"],
+  Presentation: [
+    "Present-Digi Pro",
+    "Present-Grow Max",
+    "Present-SMM",
+    "Present-Website",
+    "Present-Other",
+  ],
+  FollowUp: ["Presentation-Followup"],
+  Prospect: ["Prospect-Followup"],
+  Payment: ["Payment-Followup"],
+  "Not Interested": ["Opted for Competition", "Price Issue", "Not Now"],
+  "Presentation NI": ["Opted for Competition", "Price Issue", "Not Now"],
+  "Prospect NI": ["Opted for Competition", "Price Issue", "Not Now"],
+  "Become Distributor": ["None"],
+  "No Contactable": ["Wrong Number", "None"],
+  "Deal Done": [
+    "Present - Digi Pro",
+    "Present - Grow Max",
+    "Present - SMM",
+    "Present - Website",
+    "Present - Other",
+  ],
+};
+
 module.exports = { userRoles };
