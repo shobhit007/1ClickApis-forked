@@ -498,6 +498,7 @@ const getLeadDetails = async (req, res) => {
   try {
     const body = req.body;
     const leadId = body.leadId;
+    const type = body.type;
 
     const leadSnap = await db.collection("leads").doc(`1click${leadId}`).get();
     let leadData = leadSnap.data();
@@ -512,6 +513,18 @@ const getLeadDetails = async (req, res) => {
 
       const memberData = salesSnap.data();
       leadData.salesMemberName = memberData.name;
+    }
+
+    if (leadData.serviceExecutive) {
+      const salesSnap = await db
+        .collection("users")
+        .doc("internal_users")
+        .collection("credentials")
+        .doc(leadData.serviceExecutive)
+        .get();
+
+      const memberData = salesSnap.data();
+      leadData.serviceExecutiveName = memberData.name;
     }
 
     const detailsSnap = await db
@@ -534,6 +547,7 @@ const getLeadDetails = async (req, res) => {
         details.find((item) => item.id === "contactDetails") || {};
     }
 
+    // history
     const historySnap = await db
       .collection("leads")
       .doc(`1click${leadId}`)
@@ -542,6 +556,19 @@ const getLeadDetails = async (req, res) => {
       .get();
 
     const historyData = historySnap.docs.map((item) => ({
+      id: item.id,
+      ...item.data(),
+    }));
+
+    // service history
+    const serviceHistorySnap = await db
+      .collection("leads")
+      .doc(`1click${leadId}`)
+      .collection("history")
+      .orderBy("followUpDate", "desc")
+      .get();
+
+    const serviceHistory = serviceHistorySnap.docs.map((item) => ({
       id: item.id,
       ...item.data(),
     }));
@@ -564,7 +591,7 @@ const getLeadDetails = async (req, res) => {
 
     res.status(200).send({
       success: true,
-      data: { leadData, leadDetails, historyData, products },
+      data: { leadData, leadDetails, historyData, products, serviceHistory },
     });
   } catch (error) {
     console.log(error);

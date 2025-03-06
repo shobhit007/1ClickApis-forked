@@ -46,6 +46,22 @@ const generateId = async (type) => {
       { merge: true }
     );
     id = count;
+  } else if (type === "service") {
+    const serviceCountSnap = await db
+      .collection("backend")
+      .doc("services")
+      .get();
+    const count = serviceCountSnap?.data()?.serviceCount
+      ? serviceCountSnap?.data()?.serviceCount + 1
+      : 1;
+
+    await db.collection("backend").doc("services").set(
+      {
+        serviceCount: count,
+      },
+      { merge: true }
+    );
+    id = count;
   } else if (type == "internal_user") {
     const internalUserSnap = await db
       .collection("backend")

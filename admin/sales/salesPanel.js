@@ -26,6 +26,7 @@ const updateLead = async (req, res) => {
   try {
     const body = req.body;
     const leadId = body.leadId;
+    console.log("leadId", leadId);
     const followUpDate = body.followUpDate
       ? Timestamp.fromDate(moment(body.followUpDate).toDate())
       : null;
@@ -47,7 +48,15 @@ const updateLead = async (req, res) => {
       dataTag = historySnap.docs[0].data().disposition || "NA";
     }
 
-    await leadRef.update({ ...body, updatedAt: Timestamp.now(), dataTag });
+    const updatedData = { ...body, updatedAt: Timestamp.now(), dataTag };
+
+    const disposition = body.disposition;
+    console.log("dispostion", disposition);
+    if (disposition === "Deal Done") {
+      updatedData.welcomeCall = false;
+    }
+
+    await leadRef.update(updatedData);
     await historyRef.doc().set({
       ...body,
       updatedAt: Timestamp.now(),

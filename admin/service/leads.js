@@ -3,7 +3,11 @@ const { db, storage } = require("../../config/firebase");
 const { checkAuth } = require("../../middlewares/authMiddleware");
 const moment = require("moment");
 const { Timestamp, FieldValue } = require("firebase-admin/firestore");
-const { getTeamMembersOfUser } = require("../../utils/utils");
+const {
+  getTeamMembersOfUser,
+  generateId,
+  generateSerialNumber,
+} = require("../../utils/utils");
 const multer = require("multer");
 
 const router = express.Router();
@@ -142,10 +146,10 @@ const getServiceLeads = async (req, res) => {
     },
  */
 
+// currently using api
 const getLeadsForService = async (req, res) => {
   try {
     const body = req.body;
-    console.log("body", body);
     const value = body.value;
     const startDate = moment(body.startDate).startOf("day").toDate();
     const endDate = moment(body.endDate).endOf("day").toDate();
@@ -285,47 +289,9 @@ const getLeadsForService = async (req, res) => {
       return lead;
     });
 
-    console.log("allLeads", allLeads.length);
-
     res.status(200).json({ success: true, leads: allLeads });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: error.message, success: false });
-  }
-};
-
-const getWelcomeCalls = async (req, res) => {
-  try {
-    const userId = req.userId;
-
-    const snapshot = await db
-      .collection("leads")
-      .where("serviceExecutive", "==", userId)
-      .where("welcomeCall", "==", false)
-      .orderBy("updatedAt", "desc")
-      .get();
-
-    const leads = snapshot.docs.map((doc) => doc.data());
-    res.status(200).json({ success: true, leads: leads });
-  } catch (error) {
-    res.status(500).json({ message: error.message, success: false });
-  }
-};
-
-// Get all allocated service data of a service executive
-const getMyServiceData = async (req, res) => {
-  try {
-    const userId = req.userId;
-
-    const snapshot = await db
-      .collection("leads")
-      .where("serviceExecutive", "==", userId)
-      .orderBy("updatedAt", "desc")
-      .get();
-
-    const leads = snapshot.docs.map((doc) => doc.data());
-    res.status(200).json({ success: true, leads: leads });
-  } catch (error) {
     res.status(500).json({ message: error.message, success: false });
   }
 };
@@ -399,7 +365,6 @@ const allocateServiceLeads = async (req, res) => {
         serviceExecutive: serviceExecutive,
         allocatedServiceLeadAt: Timestamp.now(),
         assignedServiceLeadBy: req.userId,
-        welcomeCall: false,
       });
     }
 
@@ -415,51 +380,57 @@ const allocateServiceLeads = async (req, res) => {
 
 const updateWelcomeCall = async (req, res) => {
   try {
-    console.log("body", req.body);
-    const formatedData = req.body.data;
+    const data = req.body.data;
+    const leadId = data.leadId;
 
-    const {
-      bankDetails,
-      taxDetails,
-      productdDetails,
-      businessDetails,
-      personalDetails,
-      leadId,
-    } = formatedData;
-
-    const completeFormData = {
-      personalDetails,
-      businessDetails,
-      taxDetails,
-      bankDetails,
-      productdDetails,
-    };
-
-    const leadRef = db.collection("leads").doc(`1click${leadId}`);
-    const snapshot = await leadRef
-      .collection("welcomeCall")
-      .doc("welcomeCall")
-      .get();
-    if (snapshot.exists) {
-      console.log("Document exists");
-      completeFormData.updatedAt = Timestamp.now();
-      await leadRef
-        .collection("welcomeCall")
-        .doc("welcomeCall")
-        .update(completeFormData);
-    } else {
-      console.log("Document does not exist");
-      completeFormData.createdAt = Timestamp.now();
-      await leadRef
-        .collection("welcomeCall")
-        .doc("welcomeCall")
-        .set(completeFormData);
-    }
+    await db
+      .collection("leads")
+      .doc(`1click${leadId}`)
+      .update({ ...data });
 
     res.status(200).json({ message: "Form submitted successfully!" });
   } catch (error) {
     console.error("Error submitting form:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const addWwelcomeCallRemarks = async (req, res) => {
+  try {
+    const leadId = req.body.leadId;
+    const userId = req.userId;
+    const disposition = req.body.disposition;
+    const remark = req.body.remark;
+
+    const remarkBody = {
+      remark,
+      createdAt: Timestamp.now(),
+      createdBy: userId,
+      disposition,
+    };
+
+    const leadRef = db.collection("leads").doc(`1click${leadId}`);
+
+    // mark as live
+    if (disposition === "complete_details") {
+      leadRef.update({
+        startServiceAt: Timestamp.now(),
+        welcomeCall: true,
+        updatedAt: Timestamp.now(),
+      });
+    }
+
+    await leadRef
+      .collection("welcomeCall")
+      .doc("welcomeCall")
+      .collection("remarks")
+      .add(remarkBody);
+
+    res
+      .status(200)
+      .send({ success: true, message: "Remark added successfully!" });
+  } catch (error) {
+    res.status(500).json({ message: error.message, success: false });
   }
 };
 
@@ -488,8 +459,6 @@ const deleteServiceProduct = async (req, res) => {
     const productId = req.body.productId;
     const leadRef = db.collection("leads").doc(`1click${leadId}`);
 
-    console.log(req.body);
-
     await leadRef
       .collection("welcomeCall")
       .doc("welcomeCall")
@@ -513,22 +482,238 @@ const getWelcomeCallData = async (req, res) => {
       .doc("welcomeCall")
       .get();
 
-    if (snapshot.exists) {
-      const data = snapshot.data();
-      const products = await leadRef
-        .collection("welcomeCall")
-        .doc("welcomeCall")
-        .collection("products")
-        .get();
-      data.products = products.docs.map((doc) => ({
+    let allData = { products: [], remarks: [], welcomeCallData: null };
+    const data = snapshot.data();
+
+    if (data) {
+      allData.welcomeCallData = data;
+    }
+
+    const products = await leadRef
+      .collection("welcomeCall")
+      .doc("welcomeCall")
+      .collection("products")
+      .get();
+    allData.products =
+      products.docs.map((doc) => ({
         ...doc.data(),
         id: doc.id,
-      }));
-      res.status(200).json({ success: true, data });
-    } else {
-      res.status(200).json({ success: false, message: "No data found" });
-    }
+      })) || [];
+
+    // add remarks
+    const remarkSnap = await leadRef
+      .collection("welcomeCall")
+      .doc("welcomeCall")
+      .collection("remarks")
+      .orderBy("createdAt", "desc")
+      .get();
+    const remarks = remarkSnap.docs.map((doc) => ({
+      ...doc.data(),
+      id: doc.id,
+    }));
+
+    allData.remarks = remarks || [];
+
+    res.status(200).json({ success: true, data: allData });
   } catch (error) {
+    res.status(500).json({ message: error.message, success: false });
+  }
+};
+
+const updateServiceLead = async (req, res) => {
+  try {
+    const body = req.body;
+    const leadId = body.leadId;
+    const followUpDate = body.followUpDate
+      ? Timestamp.fromDate(moment(body.followUpDate).toDate())
+      : null;
+    body.followUpDate = followUpDate;
+    delete body.leadId;
+
+    const leadRef = db.collection("leads").doc(`1click${leadId}`);
+    const historyRef = db
+      .collection("leads")
+      .doc(`1click${leadId}`)
+      .collection("serviceHistory");
+
+    const historySnap = await historyRef
+      .orderBy("updatedAt", "desc")
+      .limit(1)
+      .get();
+    let serviceDataTag = "NA";
+    if (!historySnap.empty) {
+      serviceDataTag = historySnap.docs[0].data().disposition || "NA";
+    }
+
+    const updatedData = {
+      serviceDisposition: body.disposition,
+      serviceSubDisposition: body.subDisposition,
+      serviceRemarks: body.remarks,
+      serviceFollowUpDate: body.followUpDate,
+      serviceUpdatedAt: Timestamp.now(),
+      serviceDataTag,
+    };
+
+    await leadRef.update(updatedData);
+    await historyRef.doc().set({
+      ...body,
+      updatedAt: Timestamp.now(),
+      updatedBy: req.userId,
+      hierarchy: req.hierarchy,
+      type: "service",
+    });
+
+    res
+      .status(200)
+      .json({ success: true, message: "Lead updated successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: error.message, success: false });
+  }
+};
+
+const assignDistributorOrManufacturer = async (req, res) => {
+  try {
+    console.log(req.body);
+    const { manufacturerId, type, distributorId } = req.body;
+    const user = req.decoded;
+
+    const serviceId = await generateId("service");
+    const serialId = generateSerialNumber(serviceId);
+
+    const serviceData = {
+      manufacturer: manufacturerId,
+      distributor: distributorId,
+      assignedAt: Timestamp.now(),
+      assignedBy: user.userId,
+    };
+
+    await db.collection("service").doc(serialId).set(serviceData);
+
+    res.status(200).json({
+      message: `Assigned successfully!`,
+      success: true,
+    });
+  } catch (error) {
+    console.error("Error assigning distributor or manufacturer:", error);
+    res.status(500).json({ message: error.message, success: false });
+  }
+};
+
+const removeDistributorOrManufacturer = async (req, res) => {
+  try {
+    console.log(req.body);
+    const { type, serviceId } = req.body;
+    const user = req.decoded;
+
+    const serviceRef = db.collection("service").doc(serviceId);
+
+    const snapshot = await serviceRef.get();
+    const serviceData = snapshot.data();
+    const distributor = serviceData.distributor;
+    const manufacturer = serviceData.manufacturer;
+
+    serviceData.manufacturer = null;
+    serviceData.distributor = null;
+    serviceData.members = [distributor, manufacturer];
+    serviceData.unassignedAt = Timestamp.now();
+    serviceData.unassignedBy = user.userId;
+
+    await serviceRef.update(serviceData);
+
+    res.status(200).json({
+      message: `Unassigned successfully!`,
+      success: true,
+    });
+  } catch (error) {
+    console.error("Error removing distributor or manufacturer:", error);
+    res.status(500).json({ message: error.message, success: false });
+  }
+};
+
+const getDistributorsOrManufacturers = async (req, res) => {
+  try {
+    const type = req.body.type;
+    const leadId = req.body.leadId;
+
+    // Determine the collection based on the type
+    const memberType = type === "distributor" ? "manufacturer" : "distributor";
+
+    let snapshot = await db
+      .collection("leads")
+      .where("leadType", "==", memberType)
+      .get();
+
+    let data = snapshot.docs.map((item) => ({ ...item.data() }));
+
+    // assgined members
+    const assignedSnapshot = await db
+      .collection("service")
+      .where(type, "==", leadId)
+      .get();
+
+    const assignedData = assignedSnapshot.docs
+      .map((item) => ({ ...item.data() }))
+      .reduce((acc, curr) => {
+        acc[curr[memberType]] = curr;
+        return acc;
+      }, {});
+
+    // filter assigned members
+    data = data.filter((item) => {
+      return !assignedData[item.leadId];
+    });
+
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("Error fetching distributors or manufacturers:", error);
+    res.status(500).json({ message: error.message, success: false });
+  }
+};
+
+const getAssignedDistributorsOrManufacturers = async (req, res) => {
+  try {
+    const leadId = req.body.leadId;
+    const type = req.body.type;
+
+    // Determine the collection based on the type
+    const memberType = type === "distributor" ? "manufacturer" : "distributor";
+
+    const snapshot = await db
+      .collection("service")
+      .where(type, "==", leadId)
+      .get();
+    const data = snapshot.docs.map((item) => ({ ...item.data(), id: item.id }));
+
+    const serviceIdByLeads = data.reduce((acc, curr) => {
+      acc[curr[memberType]] = curr.id;
+      return acc;
+    }, {});
+
+    const leadIds = data.map((item) => item[memberType]);
+
+    const chunks = [];
+    for (let i = 0; i < leadIds.length; i += 30) {
+      chunks.push(leadIds.slice(i, i + 30));
+    }
+
+    let finalData = [];
+    const leadsPromise = chunks.map((chunk) =>
+      db.collection("leads").where("leadId", "in", chunk).get()
+    );
+    const snapshots = await Promise.all(leadsPromise);
+    snapshots.forEach((snapshot) => {
+      finalData.push(...snapshot.docs.map((doc) => doc.data()));
+    });
+
+    finalData = finalData.map((item) => {
+      item.serviceId = serviceIdByLeads[item.leadId];
+      return item;
+    });
+
+    res.status(200).json({ success: true, data: finalData });
+  } catch (error) {
+    console.error("Error fetching distributors or manufacturers:", error);
     res.status(500).json({ message: error.message, success: false });
   }
 };
@@ -536,12 +721,32 @@ const getWelcomeCallData = async (req, res) => {
 router.post("/getWelcomeCallData", checkAuth, getWelcomeCallData);
 router.post("/updateWelcomeCall", updateWelcomeCall);
 router.post("/getServiceLeads", checkAuth, getServiceLeads);
-router.post("/getWelcomeCalls", checkAuth, getWelcomeCalls);
-router.post("/getMyServiceData", checkAuth, getMyServiceData);
 router.post("/getLeadsForService", checkAuth, getLeadsForService);
 router.get("/getServiceMembers", checkAuth, getServiceMembers);
 router.post("/allocateServiceLeads", checkAuth, allocateServiceLeads);
 router.post("/uploadServiceProduct", checkAuth, uploadServiceProduct);
 router.post("/deleteServiceProduct", checkAuth, deleteServiceProduct);
+router.post("/addWwelcomeCallRemarks", checkAuth, addWwelcomeCallRemarks);
+router.post("/updateServiceLead", checkAuth, updateServiceLead);
+router.post(
+  "/getDistributorsOrManufacturers",
+  checkAuth,
+  getDistributorsOrManufacturers
+);
+router.post(
+  "/assignDistributorOrManufacturer",
+  checkAuth,
+  assignDistributorOrManufacturer
+);
+router.post(
+  "/removeDistributorOrManufacturer",
+  checkAuth,
+  removeDistributorOrManufacturer
+);
+router.post(
+  "/getAssignedDistributorsOrManufacturers",
+  checkAuth,
+  getAssignedDistributorsOrManufacturers
+);
 
 module.exports = { serviceLeads: router };
