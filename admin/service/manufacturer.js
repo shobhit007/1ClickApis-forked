@@ -256,6 +256,79 @@ const getAllProductsOfUser = async (req, res) => {
   }
 };
 
+const deleteProduct = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const userLeadId = req.userLeadId;
+
+    if (!userLeadId) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Invalid request" });
+    }
+
+    if (!productId) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Product ID is required" });
+    }
+
+    const productSnap = await db.collection("products").doc(productId).get();
+
+    if (!productSnap.exists) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Product not found" });
+    }
+
+    const productData = productSnap.data();
+    if (productData.leadId !== userLeadId) {
+      return res
+        .status(403)
+        .send({ success: false, message: "Unauthorized access" });
+    }
+
+    await db.collection("products").doc(productId).delete();
+
+    res
+      .status(200)
+      .send({ success: true, message: "Product deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message, success: false });
+  }
+};
+
+const getLeadPanelImages = async (req, res) => {
+  try {
+    let data = [
+      {
+        url: "https://images.unsplash.com/photo-1543304216-b46be324b571?q=80&w=2181&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        heading: "First Image",
+        hyperLink: "http://images.unsplash.com/photo-154330",
+      },
+      {
+        url: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        heading: "Second Image",
+        hyperLink: "http://images.unsplash.com/photo-150674",
+      },
+      {
+        url: "https://plus.unsplash.com/premium_photo-1709895873240-75894c152be0?q=80&w=1932&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        heading: "Third Image",
+        hyperLink: "http://images.unsplash.com/photo-151781",
+      },
+      {
+        url: "https://images.unsplash.com/photo-1503197979108-c824168d51a8?q=80&w=1933&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        heading: "Fourth Image",
+        hyperLink: "http://images.unsplash.com/photo-152220",
+      },
+    ];
+
+    res.status(200).send({ success: true, data });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post("/getAllocatedLeads", checkAuth, getAllocatedLeads);
 router.post("/getAllUpdatesOfLead", checkAuth, getAllUpdatesOfLead);
 router.post("/updateArchiveStatusOfLead", checkAuth, updateArchiveStatusOfLead);
@@ -263,5 +336,7 @@ router.post("/updateAllocatedLead", checkAuth, updateAllocatedLead);
 router.post("/addProduct", checkAuth, addProduct);
 router.post("/updateProduct", checkAuth, updateProduct);
 router.get("/getAllProductsOfUser", checkAuth, getAllProductsOfUser);
+router.delete("/deleteProduct/:productId", checkAuth, deleteProduct);
+router.get("/getLeadPanelImages", checkAuth, getLeadPanelImages);
 
 module.exports = { manufacturer: router };

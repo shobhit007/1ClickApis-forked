@@ -317,6 +317,7 @@ const getUserDetails = async (req, res) => {
               serviceExecutiveName: serviceExecutive.name,
               serviceExecutiveImage: serviceExecutive.userImageLink,
               serviceExecutivePhone: serviceExecutive.phone,
+              serviceExecutiveEmail: serviceExecutive.email,
             };
           }
         }
