@@ -91,11 +91,11 @@ const updateAllocatedLead = async (req, res) => {
     }
 
     await db.collection("service").doc(serviceDocId).update({
-      lastRemarks: remarks,
-      disposition,
-      subDisposition,
-      updatedBy: userLeadId,
-      updatedAt: Timestamp.now(),
+      manufacturer_lastRemarks: remarks,
+      manufacturer_disposition: disposition,
+      manufacturer_subDisposition: subDisposition,
+      lastUpdatedBy: userLeadId,
+      lastUpdatedAt: Timestamp.now(),
     });
 
     await db.collection("service").doc(serviceDocId).collection("updates").add({

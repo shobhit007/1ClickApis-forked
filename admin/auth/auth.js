@@ -286,7 +286,10 @@ const getUserDetails = async (req, res) => {
     let userData = userSnap.docs[0].data();
 
     let additionalData = {};
-    if (userData?.userType == "manufacturer") {
+    if (
+      userData?.userType == "manufacturer" ||
+      userData?.userType == "distributor"
+    ) {
       let snap = await db
         .collection("leads")
         .doc(`1click${userData.userLeadId}`)

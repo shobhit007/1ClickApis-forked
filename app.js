@@ -37,7 +37,7 @@ app.use("/admin/service", serviceLeads);
 
 // distributor
 const { distributor } = require("./admin/service/distributor");
-app.use("/admin/service/distributor", distributor);
+app.use("/service/distributor", distributor);
 
 // service panel
 const { manufacturer } = require("./admin/service/manufacturer");
