@@ -115,7 +115,7 @@ const updateAllocatedLead = async (req, res) => {
 
 const getAllUpdatesOfLead = async (req, res) => {
   try {
-    const { serviceDocId, readStatus } = req.body;
+    const { serviceDocId, manufacturer_readStatus } = req.body;
 
     if (!serviceDocId) {
       return res
@@ -130,18 +130,16 @@ const getAllUpdatesOfLead = async (req, res) => {
       .orderBy("updatedAt", "desc")
       .get();
 
-    // if readStatus is false or not present then udpate the service doc
+    // if manufacturer_readStatus is false or not present then udpate the service doc
     let increasedReadCount = false;
-    if (!readStatus) {
+    if (!manufacturer_readStatus) {
       await db.collection("service").doc(serviceDocId).update({
-        readStatus: "read",
+        manufacturer_readStatus: "read",
         readOn: Timestamp.now(),
       });
       increasedReadCount = true;
     }
-
     const updates = updatesSnap.docs.map((item) => item.data());
-
     res.status(200).send({ success: true, data: updates, increasedReadCount });
   } catch (error) {
     res.status(500).send({ success: false, message: error.message });
@@ -300,7 +298,8 @@ const deleteProduct = async (req, res) => {
 
 const getLeadPanelImages = async (req, res) => {
   try {
-    let data = [
+    const { place } = req.body;
+    let dataw = [
       {
         url: "https://images.unsplash.com/photo-1543304216-b46be324b571?q=80&w=2181&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
         heading: "First Image",
@@ -323,6 +322,17 @@ const getLeadPanelImages = async (req, res) => {
       },
     ];
 
+    const snap = await db
+      .collection("data")
+      .doc("leadPanelContent")
+      .collection("images")
+      .get();
+
+    let data = snap.docs.map((item) => ({ ...item.data(), docId: item.id }));
+    console.log(place , "place");
+    if (place) {
+      data = data.filter((item) => item.type === place);
+    }
     res.status(200).send({ success: true, data });
   } catch (error) {
     res.status(500).send({ success: false, message: error.message });
@@ -337,6 +347,6 @@ router.post("/addProduct", checkAuth, addProduct);
 router.post("/updateProduct", checkAuth, updateProduct);
 router.post("/getAllProductsOfUser", checkAuth, getAllProductsOfUser);
 router.post("/deleteProduct", checkAuth, deleteProduct);
-router.get("/getLeadPanelImages", checkAuth, getLeadPanelImages);
+router.post("/getLeadPanelImages", checkAuth, getLeadPanelImages);
 
 module.exports = { manufacturer: router };

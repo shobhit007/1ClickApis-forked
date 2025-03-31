@@ -2,6 +2,7 @@ const express = require("express");
 const { db } = require("../../config/firebase");
 const { checkAuth } = require("../../middlewares/authMiddleware");
 const { firestore } = require("firebase-admin");
+const { Timestamp } = require("firebase-admin/firestore");
 const router = express.Router();
 
 const updateColumnsForSalesPanel = async (req, res) => {
@@ -84,6 +85,78 @@ const getAllInternalMembers = async (req, res) => {
   }
 };
 
+const saveImageToShowInLeadPanel = async (req, res) => {
+  try {
+    const { type, url, heading, hyperLink, docId } = req.body;
+    // Verify all required data is available
+    if (!type || !url || !heading || !hyperLink) {
+      return res.status(400).send({
+        success: false,
+        message: "All fields (type, url, heading, hyperLink) are required.",
+      });
+    }
+
+    // Save data in the collection
+    if (docId) {
+      await db
+        .collection("data")
+        .doc("leadPanelContent")
+        .collection("images")
+        .doc(docId)
+        .set({ type, url, heading, hyperLink }, { merge: true });
+    } else {
+      await db
+        .collection("data")
+        .doc("leadPanelContent")
+        .collection("images")
+        .add({
+          type,
+          url,
+          heading,
+          hyperLink,
+          createdAt: Timestamp.now(),
+          createdBy: req.email,
+        });
+    }
+
+    setTimeout(() => {
+      res.status(200).send({
+        success: true,
+        message: "Image successfully saved.",
+      });
+    }, 2000);
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
+const deleteImageFromLeadPanel = async (req, res) => {
+  try {
+    const { docId } = req.params;
+    
+    if (!docId) {
+      return res.status(400).send({
+        success: false,
+        message: "Document ID is required.",
+      });
+    }
+
+    await db
+      .collection("data")
+      .doc("leadPanelContent")
+      .collection("images")
+      .doc(docId)
+      .delete();
+
+    res.status(200).send({
+      success: true,
+      message: "Image successfully deleted.",
+    });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 const addColumn = async (req, res) => {
   try {
     const { value, label } = req.body;
@@ -159,6 +232,17 @@ router.get("/getAllColumnsForSalesPanel", getAllColumnsForSalesPanel);
 router.post("/saveImageLinkForLoginPage", checkAuth, saveImageLinkForLoginPage);
 router.get("/getLoginPageImageLink", getLoginPageImageLink);
 router.get("/getAllInternalMembers", checkAuth, getAllInternalMembers);
+router.post(
+  "/saveImageToShowInLeadPanel",
+  checkAuth,
+  saveImageToShowInLeadPanel
+);
+
+router.delete(
+  "/deleteImageFromLeadPanel/:docId",
+  checkAuth,
+  deleteImageFromLeadPanel
+);
 router.post("/addColumn", checkAuth, addColumn);
 router.get("/getColumns", getColumns);
 router.post("/toggleColumnStatus", checkAuth, toggleColumnStatus);
