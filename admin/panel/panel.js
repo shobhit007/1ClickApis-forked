@@ -84,6 +84,71 @@ const getAllInternalMembers = async (req, res) => {
   }
 };
 
+const addColumn = async (req, res) => {
+  try {
+    const { value, label } = req.body;
+
+    if (!value || !label) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Value and label are required." });
+    }
+
+    const column = {
+      value,
+      label,
+      enabled: false,
+      createdAt: firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db
+      .collection("data")
+      .doc("dynamicColumns")
+      .collection("salesPanel")
+      .add(column);
+
+    res
+      .status(200)
+      .send({ success: true, message: "Column added successfully." });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
+const getColumns = async (req, res) => {
+  try {
+    const snap = await db
+      .collection("data")
+      .doc("dynamicColumns")
+      .collection("salesPanel")
+      .get();
+
+    const data = snap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+    res.status(200).send({ success: true, data });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
+const toggleColumnStatus = async (req, res) => {
+  try {
+    const { enabled, id } = req.body;
+
+    await db
+      .collection("data")
+      .doc("dynamicColumns")
+      .collection("salesPanel")
+      .doc(id)
+      .update({ enabled });
+
+    res
+      .status(200)
+      .send({ success: true, message: "Column status updated successfully." });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+};
+
 router.post(
   "/updateColumnsForSalesPanel",
   checkAuth,
@@ -94,5 +159,8 @@ router.get("/getAllColumnsForSalesPanel", getAllColumnsForSalesPanel);
 router.post("/saveImageLinkForLoginPage", checkAuth, saveImageLinkForLoginPage);
 router.get("/getLoginPageImageLink", getLoginPageImageLink);
 router.get("/getAllInternalMembers", checkAuth, getAllInternalMembers);
+router.post("/addColumn", checkAuth, addColumn);
+router.get("/getColumns", getColumns);
+router.post("/toggleColumnStatus", checkAuth, toggleColumnStatus);
 
 module.exports = { panel: router };

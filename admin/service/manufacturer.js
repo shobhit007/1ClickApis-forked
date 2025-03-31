@@ -173,9 +173,8 @@ const updateArchiveStatusOfLead = async (req, res) => {
 
 const addProduct = async (req, res) => {
   try {
-    console.log("adding product", req.body);
     const product = req.body;
-    const userLeadId = req.userLeadId;
+    const userLeadId = req.userLeadId || req.body.leadId;
 
     if (!userLeadId) {
       return res
@@ -205,7 +204,7 @@ const addProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const body = req.body;
-    const userLeadId = req.userLeadId;
+    const userLeadId = req.userLeadId || body.leadId;
 
     if (!userLeadId) {
       return res
@@ -229,13 +228,14 @@ const updateProduct = async (req, res) => {
       .status(200)
       .send({ success: true, message: "Products updated successfully" });
   } catch (error) {
+    console.log("error", error);
     res.status(500).json({ message: error.message, success: false });
   }
 };
 
 const getAllProductsOfUser = async (req, res) => {
   try {
-    const userLeadId = req.userLeadId;
+    const userLeadId = req.userLeadId || req.body.leadId;
     if (!userLeadId) {
       return res
         .status(400)
@@ -258,8 +258,8 @@ const getAllProductsOfUser = async (req, res) => {
 
 const deleteProduct = async (req, res) => {
   try {
-    const { productId } = req.params;
-    const userLeadId = req.userLeadId;
+    const { productId, leadId } = req.body;
+    const userLeadId = req.userLeadId || leadId;
 
     if (!userLeadId) {
       return res
@@ -335,8 +335,8 @@ router.post("/updateArchiveStatusOfLead", checkAuth, updateArchiveStatusOfLead);
 router.post("/updateAllocatedLead", checkAuth, updateAllocatedLead);
 router.post("/addProduct", checkAuth, addProduct);
 router.post("/updateProduct", checkAuth, updateProduct);
-router.get("/getAllProductsOfUser", checkAuth, getAllProductsOfUser);
-router.delete("/deleteProduct/:productId", checkAuth, deleteProduct);
+router.post("/getAllProductsOfUser", checkAuth, getAllProductsOfUser);
+router.post("/deleteProduct", checkAuth, deleteProduct);
 router.get("/getLeadPanelImages", checkAuth, getLeadPanelImages);
 
 module.exports = { manufacturer: router };

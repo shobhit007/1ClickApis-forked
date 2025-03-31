@@ -186,7 +186,7 @@ const getLeadsForService = async (req, res) => {
           .collection("leads")
           .where("disposition", "==", "Deal Done")
           .where("welcomeCall", "==", false)
-          .orderBy("updatedAt", "desc")
+          // .orderBy("updatedAt", "desc")
           .get();
 
         leads = snapshot.docs.map((doc) => doc.data());
@@ -225,7 +225,6 @@ const getLeadsForService = async (req, res) => {
         leads = snapshot.docs.map((doc) => doc.data());
         allLeads.push(...leads);
       } else {
-        console.log("here2");
         if (Array.isArray(getTeamMembers)) {
           allTeamMemberIds = getTeamMembers?.map((user) => user.id);
         }
@@ -718,6 +717,120 @@ const getAssignedDistributorsOrManufacturers = async (req, res) => {
   }
 };
 
+const searchDistributorsOrManufacturers = async (req, res) => {
+  try {
+    const body = req.body;
+    const searchQuery = body.searchQuery;
+    const searchField = body.searchField;
+
+    const snapshot = await db
+      .collection("leads")
+      .where(searchField, "==", searchQuery)
+      .get();
+
+    const data = snapshot.docs.map((item) => ({ ...item.data() }));
+
+    res.status(200).send({ success: true, data });
+  } catch (error) {
+    res.status(500).send({ message: error.message, success: false });
+  }
+};
+
+const addProductCategory = async (req, res) => {
+  try {
+    const { category } = req.body;
+
+    await db
+      .collection("data")
+      .doc("categories")
+      .set({ categories: FieldValue.arrayUnion(category) }, { merge: true });
+
+    res.status(200).json({ message: "Category added successfully!" });
+  } catch (error) {
+    console.error("Error submitting form:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const addProductSubCategory = async (req, res) => {
+  try {
+    console.log(req.body);
+    const { category, subCategory } = req.body;
+
+    const ref = db.collection("data").doc("subCategories");
+    const snapshot = await ref.get();
+    const data = snapshot.data();
+    const subCategories = data?.subCategories || {};
+    const subCategoriesList = subCategories[category] || [];
+    subCategoriesList.push(subCategory);
+    subCategories[category] = subCategoriesList;
+    console.log(subCategories);
+    await ref.set({ subCategories }, { merge: true });
+
+    res.status(200).json({ message: "Sub category added successfully!" });
+  } catch (error) {
+    console.error("Error submitting form:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const removeProductCategory = async (req, res) => {
+  try {
+    const { category } = req.body;
+
+    await db
+      .collection("data")
+      .doc("categories")
+      .set({ categories: FieldValue.arrayRemove(category) }, { merge: true });
+
+    res.status(200).json({ message: "Category removed successfully!" });
+  } catch (error) {
+    console.error("Error removing category:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const removeProductSubCategory = async (req, res) => {
+  try {
+    const { category, subCategory } = req.body;
+
+    const ref = db.collection("data").doc("subCategories");
+    const snapshot = await ref.get();
+    const data = snapshot.data();
+    const subCategories = data?.subCategories || {};
+    const subCategoriesList = subCategories[category] || [];
+    const index = subCategoriesList.indexOf(subCategory);
+    if (index > -1) {
+      subCategoriesList.splice(index, 1);
+    }
+    subCategories[category] = subCategoriesList;
+    await ref.set({ subCategories }, { merge: true });
+
+    res.status(200).json({ message: "Sub category removed successfully!" });
+  } catch (error) {
+    console.error("Error removing sub category:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const getCategoriesAndSubCategories = async (req, res) => {
+  try {
+    const categoriesSnap = await db.collection("data").doc("categories").get();
+    const subCategoriesSnap = await db
+      .collection("data")
+      .doc("subCategories")
+      .get();
+
+    const categories = categoriesSnap.data()?.categories || [];
+    const subCategories = subCategoriesSnap.data()?.subCategories || {};
+
+    res.status(200).json({ success: true, categories, subCategories });
+  } catch (error) {
+    console.error("Error submitting form:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 router.post("/getWelcomeCallData", checkAuth, getWelcomeCallData);
 router.post("/updateWelcomeCall", updateWelcomeCall);
 router.post("/getServiceLeads", checkAuth, getServiceLeads);
@@ -747,6 +860,20 @@ router.post(
   "/getAssignedDistributorsOrManufacturers",
   checkAuth,
   getAssignedDistributorsOrManufacturers
+);
+router.post(
+  "/searchDistributorsOrManufacturers",
+  checkAuth,
+  searchDistributorsOrManufacturers
+);
+router.post("/addProductCategory", checkAuth, addProductCategory);
+router.post("/addProductSubCategory", checkAuth, addProductSubCategory);
+router.post("/removeProductCategory", checkAuth, removeProductCategory);
+router.post("/removeProductSubCategory", checkAuth, removeProductSubCategory);
+router.get(
+  "/getCategoriesAndSubCategories",
+  checkAuth,
+  getCategoriesAndSubCategories
 );
 
 module.exports = { serviceLeads: router };
