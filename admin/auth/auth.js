@@ -383,6 +383,38 @@ const getUserProfile = async (req, res) => {
   }
 };
 
+const createServiceUser = async (body) => {
+  try {
+    const { email, password, userLeadId, name, phone, userType } = body;
+
+    if (!email || !password || !phone || !name || !userLeadId || !userType) {
+      return { success: false, message: "All fields are required" };
+    }
+
+    let id = await generateId("internal_user");
+    const userBody = {
+      email,
+      password,
+      userLeadId,
+      name,
+      phone,
+      userType,
+      userImageLink: "",
+      id: `1CDI${id}`,
+      createdAt: Timestamp.now(),
+    };
+
+    await db
+      .collection("users")
+      .doc("internal_users")
+      .collection("credentials")
+      .doc(`1CDI${id}`)
+      .set({ ...userBody });
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+};
+
 router.post("/login", logIn);
 router.post("/createAuth", checkAuth, createAuth);
 router.post("/updateUser", checkAuth, updateUser);
@@ -395,4 +427,4 @@ router.get("/validateToken", checkAuth, validateToken);
 router.post("/getUserProfile", checkAuth, getUserProfile);
 router.post("/updateUserProfile", checkAuth, updateUserProfile);
 
-module.exports = { auth: router };
+module.exports = { auth: router, createServiceUser };
