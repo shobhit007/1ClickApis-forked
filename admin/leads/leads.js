@@ -724,6 +724,9 @@ const getLeadsForSalesPanel = async (req, res) => {
       });
     }
 
+    console.log("first", allLeads?.length);
+    allLeads = allLeads?.filter((item) => item.leadType == "manufacturer");
+    console.log("second", allLeads?.length);
     res.status(200).send({ success: true, leads: allLeads });
   } catch (error) {
     res.status(500).send({ success: false, message: error.message });
