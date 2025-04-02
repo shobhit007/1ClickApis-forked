@@ -186,6 +186,7 @@ const getLeadsForService = async (req, res) => {
         const snapshot = await db
           .collection("leads")
           .where("disposition", "==", "Deal Done")
+          // .where("leadType", "==", "manufacturer")
           .where("welcomeCall", "==", false)
           // .orderBy("updatedAt", "desc")
           .get();
@@ -288,6 +289,8 @@ const getLeadsForService = async (req, res) => {
       }
       return lead;
     });
+
+    allLeads = allLeads?.filter((lead) => lead?.leadType === "manufacturer");
 
     res.status(200).json({ success: true, leads: allLeads });
   } catch (error) {

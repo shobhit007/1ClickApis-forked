@@ -33,7 +33,7 @@ const getLeads = async (req, res) => {
       allUsersByIds[user.id] = user;
     });
 
-    const allLeads = [];
+    let allLeads = [];
     const getTeamMembers = await getTeamMembersOfUser(userId, allUsers);
     let allTeamMemberIds = [];
 
@@ -108,7 +108,7 @@ const getLeads = async (req, res) => {
       }
     }
 
-    console.log(allLeads.length);
+    allLeads = allLeads.filter((lead) => lead?.leadType === "distributor");
 
     res.status(200).json({ leads: allLeads, success: true });
   } catch (error) {
@@ -203,8 +203,8 @@ const updateAllocatedLead = async (req, res) => {
 
     await db.collection("service").doc(serviceDocId).update({
       distributor_lastRemarks: remarks,
-      distributor_disposition:disposition,
-      distributor_subDisposition:subDisposition,
+      distributor_disposition: disposition,
+      distributor_subDisposition: subDisposition,
       lastUpdatedBy: userLeadId,
       lastUpdatedAt: Timestamp.now(),
     });
