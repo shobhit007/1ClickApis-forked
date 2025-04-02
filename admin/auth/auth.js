@@ -412,6 +412,8 @@ const createServiceUser = async (body) => {
       .collection("credentials")
       .doc(`1CDI${id}`)
       .set({ ...userBody });
+
+    return { success: true, message: "User created successfully" };
   } catch (error) {
     return { success: false, message: error.message };
   }

@@ -9,6 +9,7 @@ const {
   generateSerialNumber,
 } = require("../../utils/utils");
 const multer = require("multer");
+const { createServiceUser } = require("../auth/auth");
 
 const router = express.Router();
 
@@ -400,6 +401,7 @@ const addWwelcomeCallRemarks = async (req, res) => {
     const userId = req.userId;
     const disposition = req.body.disposition;
     const remark = req.body.remark;
+    const userType = req.body.userType;
 
     const remarkBody = {
       remark,
@@ -417,6 +419,20 @@ const addWwelcomeCallRemarks = async (req, res) => {
         welcomeCall: true,
         updatedAt: Timestamp.now(),
       });
+
+      const snapshot = await leadRef.get();
+      const leadsData = snapshot.data();
+
+      const credentials = {
+        email: leadsData.email,
+        password: "1234",
+        userLeadId: leadsData.leadId,
+        name: leadsData.full_name,
+        phone: leadsData.phone_number,
+        userType: leadsData?.leadType || "",
+      };
+
+      const response = await createServiceUser(credentials);
     }
 
     await leadRef
