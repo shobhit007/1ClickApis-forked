@@ -44,7 +44,7 @@ const logIn = async (req, res) => {
       .collection("users")
       .doc("internal_users")
       .collection("credentials")
-      .where("email", "==", email.toLowerCase())
+      .where("email", "==", email)
       .get();
 
     if (userSnap.empty) {
@@ -323,6 +323,8 @@ const getUserDetails = async (req, res) => {
               serviceExecutiveEmail: serviceExecutive.email,
             };
           }
+        } else {
+          additionalData = { ...snapdata };
         }
       } else {
         additionalData = snap.data();
